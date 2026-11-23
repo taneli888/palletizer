@@ -1,0 +1,23 @@
+{
+  "name": "Palletizer — 托盘码放测算台手机版",
+  "short_name": "Palletizer",
+  "description": "托盘、纸箱、混托、装托数量与 3D 预览，手机本地计算。",
+  "lang": "zh-CN",
+  "dir": "ltr",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4efe6",
+  "theme_color": "#17242b",
+  "icons": [
+    { "src": "icons/icon-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-1024.png", "sizes": "1024x1024", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "shortcuts": [
+    { "name": "录入托盘", "url": "./index.html" },
+    { "name": "查看方案", "url": "./index.html#plan" }
+  ]
+}

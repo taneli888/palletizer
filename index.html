@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+  <meta name="theme-color" content="#17242b">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Palletizer">
+  <meta name="description" content="Palletizer — 托盘码放测算台手机版：托盘、纸箱、混托、装托数量与 3D 预览。">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="stylesheet" href="css/mobile.css">
+  <title>Palletizer · 托盘码放测算台手机版</title>
+</head>
+<body>
+<div id="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">P</div>
+      <div class="brand-text">
+        <h1>Palletizer</h1>
+        <p>托盘码放测算台 · 手机版</p>
+      </div>
+    </div>
+    <button id="btnImport" class="icon-btn" type="button" aria-label="导入 Excel">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11m0-11 4 4m-4-4L8 7M5 14v5h14v-5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </header>
+
+  <main id="view-input" class="view active">
+    <section class="card pallet-setup">
+      <div class="card-head">
+        <h2>托盘 / 容器</h2>
+        <span id="palletChip" class="chip">内净尺寸</span>
+      </div>
+      <div class="field-grid">
+        <label class="field"><span>长 mm</span><input id="palletL" type="number" inputmode="decimal" min="0" step="0.1"></label>
+        <label class="field"><span>宽 mm</span><input id="palletW" type="number" inputmode="decimal" min="0" step="0.1"></label>
+        <label class="field"><span>最大总高 mm</span><input id="palletH" type="number" inputmode="decimal" min="0" step="0.1"></label>
+        <label class="field"><span>托盘高度 mm</span><input id="palletBase" type="number" inputmode="decimal" min="0" step="0.1"></label>
+      </div>
+      <div class="usable-line">
+        <span>可用码放高</span>
+        <strong id="usableH">—</strong>
+      </div>
+      <p class="micro">最大总高包含托盘；可用码放高 = 最大总高 − 托盘高度。</p>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>纸箱</h2>
+        <button id="btnAddCarton" class="text-btn" type="button">+ 添加</button>
+      </div>
+      <div id="cartonList" class="carton-list"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>摆放方式</h2><span class="chip subtle">平放始终允许</span></div>
+      <label class="switch-row"><span><b>允许侧立</b><small>纸箱“宽”作高</small></span><input id="allowSide" type="checkbox"><i class="switch"></i></label>
+      <label class="switch-row"><span><b>允许竖放</b><small>纸箱“长”作高</small></span><input id="allowUprightLay" type="checkbox"><i class="switch"></i></label>
+      <label class="switch-row"><span><b>允许混托</b><small>尾箱与其他规格合托</small></span><input id="allowMix" type="checkbox"><i class="switch"></i></label>
+      <label class="switch-row"><span><b>小 / 轻层垫底补空</b><small>只有减少托数才采用</small></span><input id="allowSmallBottom" type="checkbox"><i class="switch"></i></label>
+      <label class="switch-row"><span><b>全局省托</b><small>整层跨规格补位，可能不再是单一规格整托</small></span><input id="globalOptimize" type="checkbox"><i class="switch"></i></label>
+    </section>
+
+    <details class="card advanced">
+      <summary><span>高级参数</span><em>间隙 / 载重 / 层数</em></summary>
+      <div class="field-grid">
+        <label class="field"><span>箱间间隙 mm</span><input id="optGap" type="number" inputmode="decimal" min="0" step="0.1"></label>
+        <label class="field"><span>边缘余量 mm</span><input id="optMargin" type="number" inputmode="decimal" min="0" step="0.1"></label>
+        <label class="field"><span>层间垫板 mm</span><input id="optSheet" type="number" inputmode="decimal" min="0" step="0.1"></label>
+        <label class="field"><span>允许超出 mm</span><input id="optOverhang" type="number" inputmode="decimal" min="0" step="0.1"></label>
+        <label class="field"><span>最大载重 kg</span><input id="optMaxLoad" type="number" inputmode="decimal" min="0" step="1"></label>
+        <label class="field"><span>最多堆叠层数</span><input id="optMaxLayers" type="number" inputmode="numeric" min="0" step="1"></label>
+      </div>
+      <p class="micro">0 表示不限制。允许超出会向四周同时扩展。</p>
+    </details>
+
+    <button id="btnCalc" class="primary-btn" type="button">
+      <span>计算装托方案</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13m0 0-5-5m5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div id="inputHint" class="input-hint"></div>
+  </main>
+
+  <main id="view-plan" class="view">
+    <div id="planEmpty" class="empty-state">
+      <div class="empty-icon">▦</div>
+      <h2>还没有方案</h2>
+      <p>先填写托盘和纸箱，或导入 Excel，再点“计算装托方案”。</p>
+      <button id="btnGoInput" class="secondary-btn" type="button">去录入</button>
+    </div>
+    <div id="planContent">
+      <section class="hero">
+        <div class="hero-kicker" id="planKicker">装托结果</div>
+        <div class="hero-total"><strong id="planTotal">—</strong><span>托</span></div>
+        <div class="hero-sub" id="planSub">—</div>
+        <div class="hero-grid">
+          <div><b id="planFull">—</b><span>整托</span></div>
+          <div><b id="planMixed">—</b><span>混托</span></div>
+          <div><b id="planTail">—</b><span>尾托</span></div>
+          <div><b id="planBoxes">—</b><span>总箱数</span></div>
+        </div>
+      </section>
+      <div id="planNote" class="plan-note"></div>
+      <div class="section-line">
+        <h2>托盘明细</h2>
+        <span id="palletCountLabel">—</span>
+      </div>
+      <div id="palletList" class="pallet-list"></div>
+      <button id="btnExport" class="secondary-btn wide" type="button">导出 / 分享 Excel</button>
+    </div>
+  </main>
+
+  <main id="view-settings" class="view">
+    <section class="card settings-hero">
+      <div class="brand-mark large">P</div>
+      <div><h2>Palletizer</h2><p>托盘码放测算台 · 手机版</p></div>
+      <span class="version">v1.0</span>
+    </section>
+    <section class="card">
+      <h2 class="card-title">数据</h2>
+      <button id="btnImport2" class="list-btn" type="button"><span>导入 Excel</span><em>支持 .xlsx / .csv</em></button>
+      <button id="btnTemplate" class="list-btn" type="button"><span>下载导入模板</span><em>托盘参数 + 纸箱明细</em></button>
+      <button id="btnExport2" class="list-btn" type="button"><span>导出当前方案</span><em>Excel / 分享</em></button>
+      <button id="btnReset" class="list-btn danger" type="button"><span>恢复示例数据</span><em>会覆盖当前录入</em></button>
+    </section>
+    <section class="card">
+      <h2 class="card-title">安装到 iPhone</h2>
+      <p class="settings-text">Safari 打开本页 → 点底部分享按钮 → “添加到主屏幕”。安装后可以全屏运行，断网也能打开。</p>
+      <div class="install-badge" id="installBadge">未安装 · Safari 添加到主屏幕</div>
+    </section>
+    <section class="card">
+      <h2 class="card-title">关于</h2>
+      <p class="settings-text">纯本地计算，不上传托盘 / 纸箱 / 订单数据。Excel 导入和导出都在手机浏览器内完成。</p>
+      <p class="settings-text muted">分层启发式 · 顺排 / 旋转 / 对拼 / 行列混排 / 风车拼花 · 同层混装 · 全局省托</p>
+    </section>
+  </main>
+
+  <nav class="tabbar" aria-label="主导航">
+    <button class="tab active" data-tab="input" type="button">
+      <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+      <span>录入</span>
+    </button>
+    <button class="tab" data-tab="plan" type="button">
+      <svg viewBox="0 0 24 24"><path d="M4 6h7v7H4zm9 0h7v4h-7zM4 15h7v4H4zm9-3h7v7h-7z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+      <span>方案</span>
+    </button>
+    <button class="tab" data-tab="settings" type="button">
+      <svg viewBox="0 0 24 24"><path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M19 13.5v-3l-2-.5a7 7 0 0 0-.8-1.9l1.1-1.8-2.1-2.1-1.8 1.1a7 7 0 0 0-1.9-.8L11 2.5H8l-.5 2a7 7 0 0 0-1.9.8L3.8 4.2 1.7 6.3l1.1 1.8a7 7 0 0 0-.8 1.9l-2 .5v3l2 .5a7 7 0 0 0 .8 1.9l-1.1 1.8 2.1 2.1 1.8-1.1a7 7 0 0 0 1.9.8l.5 2h3l.5-2a7 7 0 0 0 1.9-.8l1.8 1.1 2.1-2.1-1.1-1.8a7 7 0 0 0 .8-1.9Z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
+      <span>设置</span>
+    </button>
+  </nav>
+</div>
+
+<div id="detail" class="detail" aria-hidden="true">
+  <header class="detail-head">
+    <button id="detailBack" class="icon-btn" type="button" aria-label="返回">
+      <svg viewBox="0 0 24 24"><path d="m15 5-7 7 7 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div><h2 id="detailTitle">托盘</h2><p id="detailSub">—</p></div>
+    <div class="seg small" id="viewSeg">
+      <button data-view="iso" class="active" type="button">立体</button>
+      <button data-view="top" type="button">俯视</button>
+    </div>
+  </header>
+  <div class="detail-scroll">
+    <div class="scene-wrap"><canvas id="scene"></canvas><div class="scene-hint">拖动旋转 · 双指缩放</div></div>
+    <div class="detail-metrics" id="detailMetrics"></div>
+    <div class="section-line"><h2>逐层明细</h2><span id="layerCountLabel">—</span></div>
+    <div id="layerList" class="layer-list"></div>
+  </div>
+</div>
+
+<div id="cartonSheet" class="sheet-backdrop" aria-hidden="true">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h2 id="sheetTitle">添加纸箱</h2><button id="sheetClose" class="text-btn" type="button">取消</button></div>
+    <div class="field-grid">
+      <label class="field span2"><span>名称 / 型号</span><input id="cartonName" type="text" autocomplete="off"></label>
+      <label class="field"><span>长 mm</span><input id="cartonL" type="number" inputmode="decimal" min="0" step="0.1"></label>
+      <label class="field"><span>宽 mm</span><input id="cartonW" type="number" inputmode="decimal" min="0" step="0.1"></label>
+      <label class="field"><span>高 mm</span><input id="cartonH" type="number" inputmode="decimal" min="0" step="0.1"></label>
+      <label class="field"><span>数量 箱</span><input id="cartonQty" type="number" inputmode="numeric" min="0" step="1"></label>
+      <label class="field"><span>单箱重量 kg</span><input id="cartonWeight" type="number" inputmode="decimal" min="0" step="0.01"></label>
+    </div>
+    <div class="sheet-actions">
+      <button id="cartonDelete" class="danger-btn" type="button">删除</button>
+      <button id="cartonSave" class="primary-btn compact" type="button">保存纸箱</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast" aria-live="polite"></div>
+<input id="fileInput" type="file" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" hidden>
+
+<script src="js/xlsx-lite.js"></script>
+<script src="js/core.js"></script>
+<script src="js/render3d.js"></script>
+<script src="js/mobile.js"></script>
+</body>
+</html>
