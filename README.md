@@ -3,6 +3,12 @@
 **托盘码放测算台 · 手机版**  
 A mobile-first pallet loading calculator for iPhone.
 
+> 目标部署地址：<https://taneli888.github.io/palletizer/>  
+> GitHub 仓库：<https://github.com/taneli888/palletizer>  
+> 部署完成后，用 iPhone Safari 扫码打开，再“添加到主屏幕”。
+
+![Palletizer 安装二维码](docs/palletizer-qr.png)
+
 ![Palletizer 录入](docs/mobile-input.png)
 ![Palletizer 方案](docs/mobile-plan.png)
 ![Palletizer 3D 详情](docs/mobile-detail.png)
