@@ -1,5 +1,5 @@
 /* Palletizer 离线缓存 */
-const CACHE = 'palletizer-v1.9.2';
+const CACHE = 'palletizer-v1.9.3';
 const ASSETS = [
   './',
   './index.html',

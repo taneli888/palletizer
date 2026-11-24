@@ -101,19 +101,6 @@
   const RULES_KEY = 'palletizer.layerRules.v1';
   let lastResult = null;
 
-  // 已验证的 1072×1072 / 410×130 20 箱布局（坐标 10mm 对齐，无重叠）
-  const KNOWN = {
-    '1072|1072|410|130|0': [
-      [0, 140, 130, 410], [0, 550, 130, 410], [10, 0, 410, 130],
-      [130, 130, 410, 130], [130, 260, 410, 130], [130, 520, 130, 410],
-      [140, 390, 410, 130], [140, 930, 410, 130], [260, 520, 130, 410],
-      [390, 520, 130, 410], [520, 0, 410, 130], [520, 540, 410, 130],
-      [520, 670, 410, 130], [520, 800, 410, 130], [550, 130, 130, 410],
-      [550, 930, 410, 130], [680, 130, 130, 410], [810, 130, 130, 410],
-      [940, 10, 130, 410], [940, 420, 130, 410]
-    ].map(r => ({ x: r[0], y: r[1], w: r[2], h: r[3], rot: r[2] < r[3] }))
-  };
-
   function values() {
     return {
       L: Number($('palletL').value), W: Number($('palletW').value),
@@ -143,7 +130,6 @@
     if (r.count > base) return `多 ${r.count - base} 箱`;
     if (r.status === 'INFEASIBLE' && r.proven) return '已证明当前最优';
     if (r.status === 'UNKNOWN') return '未找到更优';
-    if (r.status === 'KNOWN') return '内置已验证布局';
     return '未找到更优';
   }
 
@@ -153,11 +139,9 @@
     $('exactCount').textContent = `${r.count} 箱`;
     $('verdict').textContent = verdictText(r.count, base.count);
     $('elapsed').textContent = `${r.elapsed} 秒 · ${r.status}`;
-    $('note').textContent = r.status === 'KNOWN'
-      ? '这是内置的已验证布局（离线校验过，不是本次现场证明）；可以直接保存到测算台。'
-      : (r.proven
-        ? '求解器已证明没有更多箱数的布局。'
-        : '求解器在时限内没有证明最优；这不代表一定不能再多放。');
+    $('note').textContent = r.proven
+      ? '求解器已证明没有更多箱数的布局。'
+      : '求解器在时限内没有证明最优；这不代表一定不能再多放。';
     const rects = (r.rects && r.rects.length) ? r.rects : base.rects;
     draw(v, rects);
     $('result').classList.add('show');
@@ -214,16 +198,6 @@
       return;
     }
     const base = heuristic(v);
-    const knownKey = [v.L, v.W, v.a, v.b, v.gap].map(x => Number(x)).join('|');
-    if (KNOWN[knownKey]) {
-      const rects = KNOWN[knownKey];
-      showResult(v, base, {
-        count: rects.length, rects, status: 'KNOWN', elapsed: 0,
-        proven: true, supported: true
-      });
-      $('status').textContent = `使用内置已验证布局：${rects.length} 箱/层。可以保存到测算台。`;
-      return;
-    }
     const ua = navigator.userAgent || '';
     const safari = /Safari/.test(ua) && !/Chrome|CriOS|Edg|Android/.test(ua);
     if (safari) {
