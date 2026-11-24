@@ -4,7 +4,7 @@
   var Core = window.PalletCore;
   var XL = window.XlsxLite;
   var KEY = 'palletizer.v1';
-  var VERSION = '1.2.0';
+  var VERSION = '1.3.0';
   var PALETTE = ['#C99A5F', '#9FB3A6', '#C7A6A0', '#B1A3C9', '#D1B280', '#8FA9B8'];
 
   var DEFAULTS = {
@@ -355,6 +355,11 @@
       note = '全局省托没有找到更少托数，保留当前方案。';
     } else {
       note = '按大/重在下、小/轻在上；尾箱优先并入剩余空间。';
+    }
+    if (!plan.globalUsed && plan.partialTopCount > 0) {
+      note += ' 顶部平整：' +
+        (plan.flattened > 0 ? '已合并 ' + plan.flattened + ' 个尾层，' : '') +
+        '仅 ' + plan.partialTopCount + ' 托顶层有尾箱。';
     }
     $('#planNote').innerHTML = note;
 

@@ -1090,6 +1090,155 @@
     return p;
   }
 
+  function topPartialInfo(p) {
+    for (var i = p.units.length - 1; i >= 0; i--) {
+      if (p.units[i].partial) return { index: i, unit: p.units[i] };
+    }
+    return null;
+  }
+
+  function unitBoxes(u) {
+    var perWeight = u.count ? u.weight / u.count : 0;
+    return u.rects.map(function (r) {
+      return {
+        w: r.w, h: r.h, thickness: r.thickness || u.thickness, weight: perWeight,
+        skuIndex: r.skuIndex != null ? r.skuIndex : u.skuIndex
+      };
+    });
+  }
+
+  function mergeTopInto(target, source, cfg, allowMix, allowRemove) {
+    var ti = topPartialInfo(target);
+    var si = topPartialInfo(source);
+    if (!ti || !si) return false;
+    if (!allowRemove && source.units.length <= 1) return false;
+
+    var boxes = unitBoxes(ti.unit).concat(unitBoxes(si.unit));
+    if (!allowMix) {
+      var skus = {};
+      boxes.forEach(function (b) { skus[b.skuIndex] = 1; });
+      if (Object.keys(skus).length > 1) return false;
+    }
+
+    var fx0 = Infinity, fy0 = Infinity, fx1 = -Infinity, fy1 = -Infinity;
+    target.units.forEach(function (u) {
+      if (u.partial) return;
+      u.rects.forEach(function (r) {
+        if (r.wx < fx0) fx0 = r.wx;
+        if (r.wy < fy0) fy0 = r.wy;
+        if (r.wx + r.w > fx1) fx1 = r.wx + r.w;
+        if (r.wy + r.h > fy1) fy1 = r.wy + r.h;
+      });
+    });
+
+    var effL = cfg.pallet.L + 2 * cfg.overhang - 2 * cfg.margin;
+    var effW = cfg.pallet.W + 2 * cfg.overhang - 2 * cfg.margin;
+    var originX = -cfg.overhang + cfg.margin;
+    var originY = -cfg.overhang + cfg.margin;
+    var placed = null, ox = originX, oy = originY;
+    if (isFinite(fx0) && fx1 > fx0 && fy1 > fy0) {
+      placed = packMixedRects(boxes, fx1 - fx0, fy1 - fy0, cfg.gap);
+      if (placed) { ox = fx0; oy = fy0; }
+    }
+    if (!placed) {
+      placed = packMixedRects(boxes, effL, effW, cfg.gap);
+      ox = originX; oy = originY;
+    }
+    if (!placed) return false;
+
+    var bySku = {}, maxT = 0, totalW = 0, totalBulk = 0;
+    placed.forEach(function (b) {
+      bySku[b.skuIndex] = (bySku[b.skuIndex] || 0) + 1;
+      if (b.thickness > maxT) maxT = b.thickness;
+      totalW += b.weight;
+      totalBulk += b.w * b.h * b.thickness;
+    });
+    var newH = target.height - ti.unit.thickness + maxT;
+    if (newH > cfg.stackH + EPS) return false;
+    if (cfg.maxLoad > 0 && target.weight - ti.unit.weight + totalW > cfg.maxLoad + EPS) return false;
+
+    var parts = Object.keys(bySku).map(function (k) {
+      return { skuIndex: Number(k), count: bySku[k] };
+    });
+    var newUnit = {
+      skuIndex: -1, count: placed.length, thickness: maxT, weight: totalW, bulk: totalBulk,
+      partial: true, mixed: true, parts: parts, pattern: '混装补空',
+      rects: placed.map(function (b) {
+        return {
+          x: b.x, y: b.y, w: b.w, h: b.h, rot: b.rot, skuIndex: b.skuIndex,
+          thickness: b.thickness, wx: b.x + ox, wy: b.y + oy
+        };
+      })
+    };
+
+    target.units[ti.index] = newUnit;
+    source.units.splice(si.index, 1);
+    refreshPallet(target, cfg);
+    refreshPallet(source, cfg);
+    return true;
+  }
+
+  /* 不增加托盘数，尽量把多个不完整顶层并到一个托盘上 */
+  function flattenTops(pallets, cfg, allowMix, allowRemove) {
+    var merged = 0;
+    var list = pallets.slice();
+    var guard = 0;
+
+    while (guard++ < 40) {
+      var partials = list.filter(function (p) { return topPartialInfo(p); });
+      if (partials.length < 2) break;
+      partials.sort(function (a, b) {
+        return topPartialInfo(b).unit.count - topPartialInfo(a).unit.count;
+      });
+
+      var progress = false;
+      for (var t = 0; t < partials.length && !progress; t++) {
+        var target = partials[t];
+        if (list.indexOf(target) < 0) continue;
+        var sources = partials.filter(function (p) { return p !== target; });
+        sources.sort(function (a, b) {
+          return topPartialInfo(a).unit.count - topPartialInfo(b).unit.count;
+        });
+        for (var s = 0; s < sources.length; s++) {
+          var source = sources[s];
+          if (list.indexOf(source) < 0) continue;
+          if (mergeTopInto(target, source, cfg, allowMix, allowRemove)) {
+            merged++;
+            progress = true;
+            if (!source.units.length) list.splice(list.indexOf(source), 1);
+          }
+        }
+      }
+      if (!progress) break;
+    }
+
+    return { pallets: list, changed: merged > 0, merged: merged };
+  }
+
+  function finalizePalletPlan(plan, cfg) {
+    plan.pallets = plan.pallets.filter(function (p) { return p.units && p.units.length; });
+    plan.pallets.forEach(function (p, i) {
+      p.id = 'P' + (i + 1);
+      var keys = Object.keys(p.skuBreakdown);
+      p.type = keys.length > 1 ? 'mixed' : (p.hasPartial ? 'tail' : 'full');
+      p.skuIndex = keys.length === 1 ? Number(keys[0]) : -1;
+    });
+    plan.fullPallets = plan.pallets.filter(function (p) { return p.type === 'full'; });
+    plan.tailPallets = plan.pallets.filter(function (p) { return p.type === 'tail'; });
+    plan.mixedPallets = plan.pallets.filter(function (p) { return p.type === 'mixed'; });
+    plan.fullCount = plan.fullPallets.length;
+    plan.tailCount = plan.tailPallets.length;
+    plan.mixedCount = plan.mixedPallets.length;
+    plan.totalPallets = plan.pallets.length;
+    plan.totalBoxes = plan.pallets.reduce(function (s, p) { return s + p.boxes; }, 0);
+    plan.skus.forEach(function (info) {
+      info.palletCount = plan.pallets.filter(function (p) {
+        return (p.skuBreakdown[info.index] || 0) > 0;
+      }).length;
+    });
+    plan.partialTopCount = plan.pallets.filter(function (p) { return topPartialInfo(p); }).length;
+  }
+
   function stackOrder(a, b) {
     // 大/重在下，小/轻在上；部分层统一放在整层之上，部分层之间也是重下轻上
     if (a.partial !== b.partial) return a.partial ? 1 : -1;
@@ -1367,16 +1516,15 @@
     }
 
     plan.pallets = plan.fullPallets.concat(plan.tailPallets, plan.mixedPallets);
-    plan.pallets.forEach(function (p, i) { p.id = 'P' + (i + 1); });
-    plan.skus.forEach(function (info) {
-      info.palletCount = plan.pallets.filter(function (p) {
-        return (p.skuBreakdown[info.index] || 0) > 0;
-      }).length;
-    });
-    plan.fullCount = plan.fullPallets.length;
-    plan.tailCount = plan.tailPallets.length;
-    plan.mixedCount = plan.mixedPallets.length;
-    plan.totalPallets = plan.pallets.length;
+    finalizePalletPlan(plan, cfgBase);
+    var beforePartial = plan.partialTopCount;
+    var flat = flattenTops(plan.pallets, cfgBase, allowMix, !!options.allowSmallBottom);
+    if (flat.changed) {
+      plan.pallets = flat.pallets;
+      finalizePalletPlan(plan, cfgBase);
+    }
+    plan.flattened = Math.max(0, beforePartial - plan.partialTopCount);
+    plan.partialTopCount = plan.partialTopCount || 0;
     return plan;
   }
 
