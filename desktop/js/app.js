@@ -215,6 +215,155 @@
   /* ------------------------------ 主计算 ------------------------------ */
 
   var LAYER_RULES_KEY = 'palletizer.layerRules.v1';
+  var SCHEMES_KEY = 'palletizer.schemes.v1';
+
+  function loadSchemes() {
+    try {
+      var data = JSON.parse(localStorage.getItem(SCHEMES_KEY) || '{}');
+      return Array.isArray(data.schemes) ? data.schemes : [];
+    } catch (e) { return []; }
+  }
+
+  function saveSchemes(list) {
+    try { localStorage.setItem(SCHEMES_KEY, JSON.stringify({ version: 1, schemes: list })); } catch (e) {}
+  }
+
+  function saveLayerRules(rules) {
+    try { localStorage.setItem(LAYER_RULES_KEY, JSON.stringify({ rules: rules })); } catch (e) {}
+  }
+
+  function schemeRuleKey(r) {
+    return [r.L, r.W, r.a, r.b, r.gap].map(Number).join('|');
+  }
+
+  function schemeMatchingRules() {
+    var list = state.skus.length ? state.skus : [state.carton];
+    return loadLayerRules().filter(function (r) {
+      if (Math.abs(Number(r.L) - state.pallet.L) > 0.5 ||
+          Math.abs(Number(r.W) - state.pallet.W) > 0.5) return false;
+      if (Math.abs(Number(r.gap) - Number(state.opts.gap || 0)) > 0.01) return false;
+      return list.some(function (c) {
+        return Math.abs(Number(r.a) - c.l) <= 0.5 && Math.abs(Number(r.b) - c.w) <= 0.5;
+      });
+    }).map(function (r) { return clone(r); });
+  }
+
+  function mergeSchemeRules(rules) {
+    if (!Array.isArray(rules) || !rules.length) return;
+    var existing = loadLayerRules();
+    var keys = {};
+    existing.forEach(function (r) { keys[schemeRuleKey(r)] = 1; });
+    rules.forEach(function (r) {
+      if (!keys[schemeRuleKey(r)]) {
+        existing.push(r);
+        keys[schemeRuleKey(r)] = 1;
+      }
+    });
+    saveLayerRules(existing);
+  }
+
+  function schemeSummary(s) {
+    var list = s.skus && s.skus.length ? s.skus : (s.carton ? [s.carton] : []);
+    var qty = list.reduce(function (n, c) { return n + (Number(c.qty) || 0); }, 0);
+    return (s.pallet ? fmt(s.pallet.L) + '×' + fmt(s.pallet.W) : '—') +
+      ' · ' + list.length + ' 种纸箱 · ' + fmt(qty) + ' 箱';
+  }
+
+  function renderSchemes() {
+    var wrap = $('#desktopSchemeList');
+    if (!wrap) return;
+    var list = loadSchemes();
+    if (!list.length) {
+      wrap.innerHTML = '<div class="scheme-empty">还没有保存方案。</div>';
+      return;
+    }
+    wrap.innerHTML = list.map(function (s) {
+      return '<div class="scheme-row" data-scheme="' + esc(s.id) + '">' +
+        '<div class="scheme-main"><b>' + esc(s.name) + '</b><small>' + esc(schemeSummary(s)) + '</small></div>' +
+        '<div class="scheme-actions">' +
+        '<button class="load" type="button" data-act="load">调取</button>' +
+        '<button class="del" type="button" data-act="delete">删除</button>' +
+        '</div></div>';
+    }).join('');
+  }
+
+  function saveCurrentScheme() {
+    readForm();
+    var input = $('#desktopSchemeName');
+    var name = input ? input.value.trim() : '';
+    if (!name) {
+      var d = new Date();
+      name = '方案 ' + (d.getMonth() + 1) + '-' + d.getDate() + ' ' +
+        String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    }
+    var list = loadSchemes();
+    var existing = list.filter(function (s) { return s.name === name; })[0];
+    var now = new Date().toISOString();
+    var data = {
+      name: name,
+      pallet: clone(state.pallet),
+      carton: clone(state.carton),
+      skus: clone(state.skus || []),
+      opts: clone(state.opts),
+      allowMix: !!state.allowMix,
+      limits: clone(state.limits),
+      rules: schemeMatchingRules(),
+      updatedAt: now
+    };
+    if (existing) {
+      data.id = existing.id;
+      data.createdAt = existing.createdAt || now;
+      list = list.map(function (s) { return s.id === existing.id ? data : s; });
+    } else {
+      data.id = 'scheme-' + Date.now();
+      data.createdAt = now;
+      list.unshift(data);
+    }
+    saveSchemes(list.slice(0, 60));
+    if (input) input.value = '';
+    renderSchemes();
+    toast(existing ? '方案已更新' : '方案已保存');
+  }
+
+  function applyScheme(id) {
+    var s = loadSchemes().filter(function (x) { return x.id === id; })[0];
+    if (!s) return;
+    if (s.pallet) state.pallet = Object.assign({}, state.pallet, s.pallet);
+    if (s.carton) state.carton = Object.assign({}, state.carton, s.carton);
+    if (Array.isArray(s.skus)) state.skus = clone(s.skus);
+    if (s.opts) state.opts = Object.assign({}, state.opts, s.opts);
+    if (s.allowMix != null) state.allowMix = !!s.allowMix;
+    if (s.limits) state.limits = Object.assign({}, state.limits, s.limits);
+    mergeSchemeRules(s.rules);
+    fillForm();
+    closeSchemeModal();
+    recompute();
+    scheduleSave();
+    toast('已调取方案：' + s.name);
+  }
+
+  function deleteScheme(id) {
+    var list = loadSchemes();
+    var s = list.filter(function (x) { return x.id === id; })[0];
+    if (!s) return;
+    if (!window.confirm('删除方案“' + s.name + '”？')) return;
+    saveSchemes(list.filter(function (x) { return x.id !== id; }));
+    renderSchemes();
+    toast('方案已删除');
+  }
+
+  function openSchemeModal() {
+    renderSchemes();
+    var modal = $('#schemeModal');
+    if (modal) modal.hidden = false;
+    var input = $('#desktopSchemeName');
+    if (input) input.focus();
+  }
+
+  function closeSchemeModal() {
+    var modal = $('#schemeModal');
+    if (modal) modal.hidden = true;
+  }
 
   function loadLayerRules() {
     try {
@@ -1875,6 +2024,24 @@
         render3D();
         renderLayers();
       }
+    });
+
+    $('#btnSchemes').addEventListener('click', openSchemeModal);
+    $('#schemeClose').addEventListener('click', closeSchemeModal);
+    $('#schemeModal').addEventListener('click', function (e) {
+      if (e.target === $('#schemeModal')) closeSchemeModal();
+    });
+    $('#desktopSaveScheme').addEventListener('click', saveCurrentScheme);
+    $('#desktopSchemeName').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); saveCurrentScheme(); }
+    });
+    $('#desktopSchemeList').addEventListener('click', function (e) {
+      var btn = e.target.closest('button[data-act]');
+      if (!btn) return;
+      var row = btn.closest('[data-scheme]');
+      if (!row) return;
+      if (btn.dataset.act === 'load') applyScheme(row.dataset.scheme);
+      else if (btn.dataset.act === 'delete') deleteScheme(row.dataset.scheme);
     });
 
     var hint = $('#vpHint');

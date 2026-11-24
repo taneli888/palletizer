@@ -1174,3 +1174,34 @@ input[type="range"]::-moz-range-thumb { width: 11px; height: 11px; border-radius
   .top-actions { width: 100%; justify-content: flex-end; }
   .vp-hint { display: none; }
 }
+
+/* 方案库 */
+.scheme-modal {
+  position: fixed; inset: 0; z-index: 120; display: flex; align-items: center; justify-content: center;
+  background: rgba(14, 20, 25, .46); padding: 24px;
+}
+.scheme-modal[hidden] { display: none; }
+.scheme-dialog {
+  width: min(620px, 100%); max-height: min(78vh, 720px); overflow: hidden;
+  background: #fbf8f1; border: 1px solid #d8d1c2; border-radius: 18px;
+  box-shadow: 0 28px 60px rgba(15, 20, 24, .28); display: flex; flex-direction: column;
+}
+.scheme-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px 4px; }
+.scheme-head h2 { margin: 0; font-size: 18px; }
+.scheme-hint { margin: 0; padding: 0 18px 10px; color: #746b5c; font-size: 12px; }
+.scheme-save { display: flex; gap: 8px; padding: 0 18px 12px; }
+.scheme-save input {
+  flex: 1; min-width: 0; border: 1px solid #cfc6b5; border-radius: 10px;
+  background: #fffdf8; padding: 9px 11px; font: inherit; color: #18202a;
+}
+.scheme-list { overflow-y: auto; padding: 0 18px 16px; }
+.scheme-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid #eee6d9; }
+.scheme-row:first-child { border-top: 0; }
+.scheme-main { flex: 1; min-width: 0; }
+.scheme-main b { display: block; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scheme-main small { display: block; color: #8b8172; font-size: 11px; margin-top: 2px; }
+.scheme-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.scheme-actions button { border: 0; border-radius: 8px; padding: 6px 9px; font-size: 11px; cursor: pointer; }
+.scheme-actions .load { background: #1a222c; color: #fff; }
+.scheme-actions .del { background: #f1e7dc; color: #8a4b35; }
+.scheme-empty { color: #8b8172; font-size: 12px; padding: 10px 0; }

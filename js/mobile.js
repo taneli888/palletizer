@@ -4,7 +4,7 @@
   var Core = window.PalletCore;
   var XL = window.XlsxLite;
   var KEY = 'palletizer.v1';
-  var VERSION = '1.9.6';
+  var VERSION = '1.9.7';
   var PALETTE = ['#C99A5F', '#9FB3A6', '#C7A6A0', '#B1A3C9', '#D1B280', '#8FA9B8'];
 
   var DEFAULTS = {
@@ -292,12 +292,150 @@
   }
 
   var RULES_KEY = 'palletizer.layerRules.v1';
+  var SCHEMES_KEY = 'palletizer.schemes.v1';
 
   function loadLayerRules() {
     try {
       var data = JSON.parse(localStorage.getItem(RULES_KEY) || '{}');
       return Array.isArray(data.rules) ? data.rules : [];
     } catch (e) { return []; }
+  }
+
+  function saveLayerRules(rules) {
+    try { localStorage.setItem(RULES_KEY, JSON.stringify({ rules: rules })); } catch (e) {}
+  }
+
+  function loadSchemes() {
+    try {
+      var data = JSON.parse(localStorage.getItem(SCHEMES_KEY) || '{}');
+      return Array.isArray(data.schemes) ? data.schemes : [];
+    } catch (e) { return []; }
+  }
+
+  function saveSchemes(list) {
+    try { localStorage.setItem(SCHEMES_KEY, JSON.stringify({ version: 1, schemes: list })); } catch (e) {}
+  }
+
+  function schemeRuleKey(r) {
+    return [r.L, r.W, r.a, r.b, r.gap].map(Number).join('|');
+  }
+
+  function schemeMatchingRules() {
+    var L = state.pallet.L, W = state.pallet.W;
+    var result = [];
+    loadLayerRules().forEach(function (r) {
+      if (Math.abs(Number(r.L) - L) > 0.5 || Math.abs(Number(r.W) - W) > 0.5) return;
+      for (var i = 0; i < state.cartons.length; i++) {
+        var c = state.cartons[i];
+        if (Math.abs(Number(r.a) - c.l) <= 0.5 &&
+            Math.abs(Number(r.b) - c.w) <= 0.5 &&
+            Math.abs(Number(r.gap) - state.opts.gap) <= 0.01) {
+          result.push(JSON.parse(JSON.stringify(r)));
+          return;
+        }
+      }
+    });
+    return result;
+  }
+
+  function schemeSummary(s) {
+    var qty = (s.cartons || []).reduce(function (n, c) { return n + (Number(c.qty) || 0); }, 0);
+    return (s.pallet ? fmt(s.pallet.L) + '×' + fmt(s.pallet.W) : '—') +
+      ' · ' + (s.cartons || []).length + ' 种纸箱 · ' + fmt(qty) + ' 箱';
+  }
+
+  function saveCurrentScheme() {
+    readPalletInputs();
+    readAdvanced();
+    var input = $('#schemeName');
+    var name = input ? input.value.trim() : '';
+    if (!name) {
+      var d = new Date();
+      name = '方案 ' + (d.getMonth() + 1) + '-' + d.getDate() + ' ' +
+        String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    }
+    var list = loadSchemes();
+    var existing = list.filter(function (s) { return s.name === name; })[0];
+    var now = new Date().toISOString();
+    var data = {
+      name: name,
+      pallet: clone(state.pallet),
+      cartons: clone(state.cartons),
+      opts: clone(state.opts),
+      rules: schemeMatchingRules(),
+      updatedAt: now
+    };
+    if (existing) {
+      data.id = existing.id;
+      data.createdAt = existing.createdAt || now;
+      list = list.map(function (s) { return s.id === existing.id ? data : s; });
+    } else {
+      data.id = 'scheme-' + Date.now();
+      data.createdAt = now;
+      list.unshift(data);
+    }
+    saveSchemes(list.slice(0, 60));
+    if (input) input.value = '';
+    renderSchemes();
+    toast(existing ? '方案已更新' : '方案已保存');
+  }
+
+  function renderSchemes() {
+    var wrap = $('#schemeList');
+    if (!wrap) return;
+    var list = loadSchemes();
+    if (!list.length) {
+      wrap.innerHTML = '<div class="scheme-empty">还没有保存方案。</div>';
+      return;
+    }
+    wrap.innerHTML = list.map(function (s) {
+      return '<div class="scheme-row" data-scheme="' + esc(s.id) + '">' +
+        '<div class="scheme-main"><b>' + esc(s.name) + '</b><small>' + esc(schemeSummary(s)) + '</small></div>' +
+        '<div class="scheme-actions">' +
+        '<button class="load" type="button" data-act="load">调取</button>' +
+        '<button class="del" type="button" data-act="delete">删除</button>' +
+        '</div></div>';
+    }).join('');
+  }
+
+  function mergeSchemesRules(rules) {
+    if (!Array.isArray(rules) || !rules.length) return;
+    var existing = loadLayerRules();
+    var keys = {};
+    existing.forEach(function (r) { keys[schemeRuleKey(r)] = 1; });
+    rules.forEach(function (r) {
+      if (!keys[schemeRuleKey(r)]) {
+        existing.push(r);
+        keys[schemeRuleKey(r)] = 1;
+      }
+    });
+    saveLayerRules(existing);
+  }
+
+  function applyScheme(id) {
+    var s = loadSchemes().filter(function (x) { return x.id === id; })[0];
+    if (!s) return;
+    if (s.pallet) state.pallet = Object.assign({}, state.pallet, s.pallet);
+    if (Array.isArray(s.cartons) && s.cartons.length) state.cartons = clone(s.cartons);
+    if (s.opts) state.opts = Object.assign({}, state.opts, s.opts);
+    mergeSchemesRules(s.rules);
+    saveState();
+    syncPalletInputs();
+    syncAdvanced();
+    syncSwitches();
+    renderCartons();
+    compute(true);
+    toast('已调取方案：' + s.name);
+  }
+
+  function deleteScheme(id) {
+    var list = loadSchemes();
+    var s = list.filter(function (x) { return x.id === id; })[0];
+    if (!s) return;
+    if (!window.confirm('删除方案“' + s.name + '”？')) return;
+    saveSchemes(list.filter(function (x) { return x.id !== id; }));
+    renderSchemes();
+    toast('方案已删除');
   }
 
   function ruleFor(cfg, sol) {
@@ -951,6 +1089,22 @@
       switchTab('input');
       toast('已恢复示例数据');
     });
+
+    if ($('#saveScheme')) {
+      $('#saveScheme').addEventListener('click', saveCurrentScheme);
+      $('#schemeName').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); saveCurrentScheme(); }
+      });
+      $('#schemeList').addEventListener('click', function (e) {
+        var btn = e.target.closest('button[data-act]');
+        if (!btn) return;
+        var row = btn.closest('[data-scheme]');
+        if (!row) return;
+        if (btn.dataset.act === 'load') applyScheme(row.dataset.scheme);
+        else if (btn.dataset.act === 'delete') deleteScheme(row.dataset.scheme);
+      });
+      renderSchemes();
+    }
     $('#fontSeg').addEventListener('click', function (e) {
       var b = e.target.closest('[data-font]');
       if (!b) return;

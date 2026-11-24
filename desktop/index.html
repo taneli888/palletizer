@@ -25,6 +25,7 @@
       </div>
     </div>
     <div class="top-actions">
+      <button class="btn ghost" id="btnSchemes" type="button" title="保存 / 调取命名方案">方案</button>
       <a class="btn ghost" href="../exact.html" title="精确优化单层（实验，需联网）">精确优化</a>
       <a class="btn ghost" href="../?mobile=1" title="切换到手机版布局">手机版</a>
       <span class="save-hint" id="saveHint"></span>
@@ -311,6 +312,21 @@
   </main>
 
   <div class="toast" id="toast" role="status"></div>
+</div>
+
+<div class="scheme-modal" id="schemeModal" hidden>
+  <div class="scheme-dialog" role="dialog" aria-modal="true" aria-labelledby="schemeTitle">
+    <div class="scheme-head">
+      <h2 id="schemeTitle">方案库</h2>
+      <button class="icon-btn" id="schemeClose" type="button" aria-label="关闭">×</button>
+    </div>
+    <p class="scheme-hint">保存托盘、纸箱、数量和码放参数；同名保存会覆盖更新。</p>
+    <div class="scheme-save">
+      <input id="desktopSchemeName" type="text" maxlength="40" placeholder="给当前方案起个名字">
+      <button class="btn primary" id="desktopSaveScheme" type="button">保存当前</button>
+    </div>
+    <div id="desktopSchemeList" class="scheme-list"></div>
+  </div>
 </div>
 
 <script src="js/core.js"></script>

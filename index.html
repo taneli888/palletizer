@@ -136,7 +136,7 @@
     <section class="card settings-hero">
       <div class="brand-mark large">P</div>
       <div><h2>Palletizer</h2><p>托盘码放测算台</p></div>
-      <span class="version">v1.9.6</span>
+      <span class="version">v1.9.7</span>
     </section>
     <section class="card">
       <h2 class="card-title">数据</h2>
@@ -146,6 +146,15 @@
       <a class="list-btn" href="exact.html"><span>精确优化单层</span><em>实验 · 需联网 · 不影响日常方案</em></a>
       <label class="switch-row"><span><b>自动使用已保存的精确布局</b><small id="exactRuleInfo">还没有保存规则</small></span><input id="useExactRules" type="checkbox"><i class="switch"></i></label>
       <button id="btnReset" class="list-btn danger" type="button"><span>恢复示例数据</span><em>会覆盖当前录入</em></button>
+    </section>
+    <section class="card">
+      <h2 class="card-title">方案库</h2>
+      <p class="micro">保存托盘、纸箱、数量和码放参数；以后点“调取”即可恢复。</p>
+      <div class="scheme-save">
+        <input id="schemeName" type="text" maxlength="40" placeholder="给当前方案起个名字">
+        <button id="saveScheme" class="primary-btn compact" type="button">保存当前</button>
+      </div>
+      <div id="schemeList" class="scheme-list"></div>
     </section>
     <section class="card">
       <h2 class="card-title">显示</h2>

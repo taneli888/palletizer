@@ -209,6 +209,25 @@ svg { width: 22px; height: 22px; display: block; }
 }
 .list-btn:first-of-type { border-top: 0; }
 a.list-btn { text-decoration: none; color: inherit; }
+
+.scheme-save { display: flex; gap: 8px; align-items: stretch; margin-bottom: 8px; }
+.scheme-save input {
+  flex: 1; min-width: 0; border: 1px solid #d8cdbb; border-radius: 11px;
+  background: #fffdf8; color: var(--ink); padding: 9px 11px; font: inherit; font-size: 13px;
+}
+.scheme-row {
+  display: flex; align-items: center; gap: 8px; padding: 9px 0;
+  border-top: 1px solid #f0e9dd;
+}
+.scheme-row:first-child { border-top: 0; }
+.scheme-main { flex: 1; min-width: 0; }
+.scheme-main b { display: block; font-size: 13px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scheme-main small { display: block; color: var(--faint); font-size: 10.5px; margin-top: 1px; }
+.scheme-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.scheme-actions button { border: 0; border-radius: 8px; padding: 5px 8px; font-size: 11px; cursor: pointer; }
+.scheme-actions .load { background: #1a222c; color: #fff; }
+.scheme-actions .del { background: #f1e7dc; color: #8a4b35; }
+.scheme-empty { color: var(--faint); font-size: 11px; padding: 8px 0; }
 .list-btn span { font-size: 14px; font-weight: 600; }
 .list-btn em { font-style: normal; font-size: 10px; color: var(--faint); }
 .list-btn.danger span { color: var(--danger); }
