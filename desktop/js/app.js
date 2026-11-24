@@ -980,7 +980,7 @@
       fmt(state.pallet.H + activeDeltas().H) + ' mm · ' + sol.layers + ' 层';
   }
 
-  function layerSVG(sol, withLabels) {
+  function layerSVG(sol, withLabels, actual) {
     if (!sol || !sol.ok || !sol.layer || !sol.layer.rects.length) return '';
     var labels = [];
     if (withLabels) {
@@ -996,10 +996,10 @@
     }
     return rectsSVG(sol.layer.rects, sol.dims.L, sol.dims.W, function (r) {
       return r.rot ? '#c08b4e' : '#c99a5f';
-    }, labels);
+    }, labels, actual);
   }
 
-  function rectsSVG(rects, L, W, colorFn, labels) {
+  function rectsSVG(rects, L, W, colorFn, labels, actual) {
     if (!rects || !rects.length) return '';
     var minX = 0, minY = 0, maxX = L, maxY = W;
     rects.forEach(function (r) {
@@ -1008,12 +1008,17 @@
       if (r.wx + r.w > maxX) maxX = r.wx + r.w;
       if (r.wy + r.h > maxY) maxY = r.wy + r.h;
     });
+    var outside = actual ? Math.max(38, Math.max(L, W) * 0.11) : 0;
+    if (actual) {
+      minX = Math.min(minX, -outside - 28);
+      maxY = Math.max(maxY, W + outside + 34);
+    }
     var pad = Math.max(2, Math.max(maxX - minX, maxY - minY) * 0.025);
     var vb = (minX - pad) + ' ' + (minY - pad) + ' ' +
       (maxX - minX + pad * 2) + ' ' + (maxY - minY + pad * 2);
     var parts = [];
     parts.push('<svg viewBox="' + vb + '" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">');
-    if (labels && labels.length) {
+    if ((labels && labels.length) || actual) {
       parts.push('<defs><marker id="dimArrow" markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto">' +
         '<path d="M0 0 L7 3.5 L0 7 Z" fill="#8a4b22"/></marker></defs>');
     }
@@ -1038,6 +1043,31 @@
       parts.push('<text x="' + (lineX - fs * 0.55) + '" y="' + midY + '" text-anchor="middle" dominant-baseline="middle" font-size="' + fs +
         '" fill="#6b3a1c" transform="rotate(-90 ' + (lineX - fs * 0.55) + ' ' + midY + ')">' + esc(lab.hText) + '</text>');
     });
+    if (actual) {
+      var fs2 = Math.max(7, Math.min(22, Math.min(actual.L, actual.W) * 0.028));
+      var lineY2 = W + outside;
+      var lineX2 = -outside;
+      var midX2 = actual.x0 + actual.L / 2;
+      var midY2 = actual.y0 + actual.W / 2;
+      // 实际长：托盘外侧下方
+      parts.push('<line x1="' + actual.x0 + '" y1="' + actual.y1 + '" x2="' + actual.x0 + '" y2="' + lineY2 +
+        '" stroke="#8a4b22" stroke-width="0.6" stroke-dasharray="2 2" vector-effect="non-scaling-stroke"/>');
+      parts.push('<line x1="' + (actual.x0 + actual.L) + '" y1="' + actual.y1 + '" x2="' + (actual.x0 + actual.L) + '" y2="' + lineY2 +
+        '" stroke="#8a4b22" stroke-width="0.6" stroke-dasharray="2 2" vector-effect="non-scaling-stroke"/>');
+      parts.push('<line x1="' + actual.x0 + '" y1="' + lineY2 + '" x2="' + (actual.x0 + actual.L) + '" y2="' + lineY2 +
+        '" stroke="#8a4b22" stroke-width="0.9" vector-effect="non-scaling-stroke" marker-start="url(#dimArrow)" marker-end="url(#dimArrow)"/>');
+      parts.push('<text x="' + midX2 + '" y="' + (lineY2 + fs2 * 0.9) + '" text-anchor="middle" font-size="' + fs2 +
+        '" fill="#6b3a1c">实际长 ' + fmt(actual.L) + '</text>');
+      // 实际宽：托盘外侧左侧
+      parts.push('<line x1="' + actual.x0 + '" y1="' + actual.y0 + '" x2="' + lineX2 + '" y2="' + actual.y0 +
+        '" stroke="#8a4b22" stroke-width="0.6" stroke-dasharray="2 2" vector-effect="non-scaling-stroke"/>');
+      parts.push('<line x1="' + actual.x0 + '" y1="' + (actual.y0 + actual.W) + '" x2="' + lineX2 + '" y2="' + (actual.y0 + actual.W) +
+        '" stroke="#8a4b22" stroke-width="0.6" stroke-dasharray="2 2" vector-effect="non-scaling-stroke"/>');
+      parts.push('<line x1="' + lineX2 + '" y1="' + actual.y0 + '" x2="' + lineX2 + '" y2="' + (actual.y0 + actual.W) +
+        '" stroke="#8a4b22" stroke-width="0.9" vector-effect="non-scaling-stroke" marker-start="url(#dimArrow)" marker-end="url(#dimArrow)"/>');
+      parts.push('<text x="' + (lineX2 - fs2 * 0.55) + '" y="' + midY2 + '" text-anchor="middle" dominant-baseline="middle" font-size="' + fs2 +
+        '" fill="#6b3a1c" transform="rotate(-90 ' + (lineX2 - fs2 * 0.55) + ' ' + midY2 + ')">实际宽 ' + fmt(actual.W) + '</text>');
+    }
     parts.push('</svg>');
     return parts.join('');
   }
@@ -1939,7 +1969,7 @@
       '<div class="kpi"><span>实际占用</span><b style="font-size:14px">' + fmt(actual.L) + '×' + fmt(actual.W) + '×' + fmt(actual.H) + '</b></div>' +
       '<div class="kpi"><span>订单需托</span><b>' + (plan ? plan.totalPallets : sol.pallets) + '</b></div>' +
       '</div>' +
-      '<div class="layout"><div class="drawing"><h2>单层排布（俯视）</h2>' + layerSVG(sol, true) +
+      '<div class="layout"><div class="drawing"><h2>单层排布（俯视）</h2>' + layerSVG(sol, true, actual) +
       '<p class="sub">' + esc(sol.layer.pattern) + ' · 每层 ' + sol.perLayer + ' 箱 · ' + esc(sol.orientation.label) + '</p></div>' +
       '<div class="params"><h2>方案参数</h2>' +
       '<div><span>可用尺寸（长×宽×可用高）</span><b>' + fmt(dims.L) + ' × ' + fmt(dims.W) + ' × ' + fmt(dims.H) + '</b></div>' +
