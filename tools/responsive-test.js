@@ -97,9 +97,11 @@ async function shot(cdp, name) {
       inputDisplay: getComputedStyle(document.querySelector('#view-input')).display,
       cols: getComputedStyle(document.querySelector('#view-input')).gridTemplateColumns,
       overflow: document.documentElement.scrollWidth <= innerWidth + 1,
-      tabWidth: Math.round(document.querySelector('.tabbar').getBoundingClientRect().width)
+      tabWidth: Math.round(document.querySelector('.tabbar').getBoundingClientRect().width),
+      brandSub: document.querySelector('.brand-text p').textContent.trim()
     })`);
     console.log('ipad:', ipad);
+    if (ipad.brandSub.includes('手机版')) throw new Error('iPad 仍显示手机版');
     if (ipad.inputDisplay !== 'grid') throw new Error('iPad 录入页应为两列');
     if (!ipad.cols.split(' ').length || ipad.cols.split(' ').length < 2) throw new Error('iPad 列数不正确');
     if (ipad.tabWidth > 460) throw new Error('iPad 底部导航过宽');

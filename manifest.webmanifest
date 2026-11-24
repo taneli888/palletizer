@@ -1,7 +1,7 @@
 {
-  "name": "Palletizer — 托盘码放测算台手机版",
+  "name": "Palletizer — 托盘码放测算台",
   "short_name": "Palletizer",
-  "description": "托盘、纸箱、混托、装托数量与 3D 预览，手机本地计算。",
+  "description": "托盘、纸箱、混托、装托数量与 3D 预览，本地计算。",
   "lang": "zh-CN",
   "dir": "ltr",
   "start_url": "./index.html",
