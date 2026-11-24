@@ -426,6 +426,10 @@
   function recompute(opts) {
     opts = opts || {};
     readForm();
+    if (inputIsTooDense()) {
+      toast('纸箱尺寸过小，已暂停计算；请检查长宽和托盘尺寸');
+      return;
+    }
     state.deltas = activeDeltas();
     var cfg = buildConfig();
     var exactBase = exactSolutionFor(cfg);
@@ -1224,13 +1228,30 @@
 
   /* ------------------------------ 交互 ------------------------------ */
 
+  function estimatedLayerBoxes() {
+    var a = Number(state.carton.l), b = Number(state.carton.w);
+    if (!(a > 0) || !(b > 0)) return Infinity;
+    var n1 = Math.floor(state.pallet.L / a) * Math.floor(state.pallet.W / b);
+    var n2 = Math.floor(state.pallet.L / b) * Math.floor(state.pallet.W / a);
+    return Math.max(n1, n2);
+  }
+
+  function inputIsTooDense() {
+    return estimatedLayerBoxes() > 5000;
+  }
+
   function onParamInput() {
     readForm();
+    if (inputIsTooDense()) {
+      toast('纸箱尺寸过小，单层箱数超过 5000；请确认尺寸后再计算');
+      scheduleSave();
+      return;
+    }
     if (skuIndex >= 0 && state.skus[skuIndex]) {
       state.skus[skuIndex] = clone(state.carton);
     }
     clearTimeout(recomputeTimer);
-    recomputeTimer = setTimeout(function () { recompute(); }, 120);
+    recomputeTimer = setTimeout(function () { recompute(); }, 250);
     scheduleSave();
   }
 
@@ -1898,7 +1919,15 @@
     ['palletL', 'palletW', 'palletH', 'palletBase', 'cartonName', 'cartonL', 'cartonW', 'cartonH',
       'cartonQty', 'cartonWeight', 'optGap', 'optMargin', 'optSheet', 'optOverhang',
       'optMaxLoad', 'optMaxLayers'].forEach(function (id) {
+        // 输入时只做防抖；纸箱过小会被 inputIsTooDense 拦截，避免把 120 输到一半时按 1 卡死
         $('#' + id).addEventListener('input', onParamInput);
+        $('#' + id).addEventListener('change', onParamInput);
+        $('#' + id).addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            e.target.blur();
+          }
+        });
       });
     ['limL', 'limW', 'limH'].forEach(function (id) {
       $('#' + id).addEventListener('input', onLimitsInput);
