@@ -3,7 +3,7 @@
 **托盘码放测算台**  
 A responsive pallet loading calculator for iPhone, iPad and desktop.
 
-**v1.9.4：精确页支持导入 Python OR-Tools 导出的 JSON 坐标；网页单线程限制说明；时限放宽到 600 秒；不再内置任何布局。**
+**v1.9.5：修复导入精确规则后 3D 只显示托盘、不显示箱子的问题（补齐 wx/wy 世界坐标）；精确页支持导入 Python JSON；不内置布局。**
 
 > 目标部署地址：<https://taneli888.github.io/palletizer/>  
 > GitHub 仓库：<https://github.com/taneli888/palletizer>  

@@ -242,12 +242,28 @@
       }
       if (!(layers > 0)) return null;
       var sol = Object.assign({}, base);
+      var originX = -cfg.overhang + cfg.margin;
+      var originY = -cfg.overhang + cfg.margin;
+      var rects = r.rects.map(function (x) {
+        return Object.assign({}, x, {
+          wx: Number(x.x) + originX,
+          wy: Number(x.y) + originY,
+          thickness: base.orientation.thickness
+        });
+      });
+      var maxX = 0, maxY = 0;
+      rects.forEach(function (x) {
+        maxX = Math.max(maxX, x.x + x.w);
+        maxY = Math.max(maxY, x.y + x.h);
+      });
       sol.perLayer = count;
       sol.layers = layers;
       sol.total = count * layers;
       sol.layer = Object.assign({}, base.layer, {
         count: count,
-        rects: r.rects.map(function (x) { return Object.assign({}, x); }),
+        rects: rects,
+        usedW: maxX,
+        usedH: maxY,
         pattern: '精确规则',
         patternKey: 'exactRule'
       });

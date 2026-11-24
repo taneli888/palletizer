@@ -4,7 +4,7 @@
   var Core = window.PalletCore;
   var XL = window.XlsxLite;
   var KEY = 'palletizer.v1';
-  var VERSION = '1.9.4';
+  var VERSION = '1.9.5';
   var PALETTE = ['#C99A5F', '#9FB3A6', '#C7A6A0', '#B1A3C9', '#D1B280', '#8FA9B8'];
 
   var DEFAULTS = {
@@ -327,12 +327,28 @@
     }
     if (!(layers > 0)) return null;
     var sol = Object.assign({}, base);
+    var originX = -cfg.overhang + cfg.margin;
+    var originY = -cfg.overhang + cfg.margin;
+    var rects = rule.rects.map(function (r) {
+      return Object.assign({}, r, {
+        wx: Number(r.x) + originX,
+        wy: Number(r.y) + originY,
+        thickness: base.orientation.thickness
+      });
+    });
+    var maxX = 0, maxY = 0;
+    rects.forEach(function (r) {
+      maxX = Math.max(maxX, r.x + r.w);
+      maxY = Math.max(maxY, r.y + r.h);
+    });
     sol.perLayer = count;
     sol.layers = layers;
     sol.total = count * layers;
     sol.layer = Object.assign({}, base.layer, {
       count: count,
-      rects: rule.rects.map(function (r) { return Object.assign({}, r); }),
+      rects: rects,
+      usedW: maxX,
+      usedH: maxY,
       pattern: '精确规则',
       patternKey: 'exactRule'
     });
