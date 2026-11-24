@@ -132,6 +132,12 @@
       return;
     }
     const base = heuristic(v);
+    const ua = navigator.userAgent || '';
+    const safari = /Safari/.test(ua) && !/Chrome|CriOS|Edg|Android/.test(ua);
+    if (safari) {
+      $('status').textContent = 'Safari / iPhone 目前不支持这个 CP-SAT WebAssembly 求解器。请用电脑 Chrome 或 Edge 打开本页。';
+      return;
+    }
     running = true;
     $('run').disabled = true;
     $('result').classList.remove('show');
@@ -142,7 +148,8 @@
       $('status').textContent = `启发式每层 ${base.count} 箱；精确求解中……已 ${sec} 秒（上限 ${v.timeLimit} 秒）`;
     }, 1000);
     try {
-      const mod = await import(`./js/exact-layer.js?v=1.9.0`);
+      const modUrl = new URL('js/exact-layer.js', document.baseURI).href;
+      const mod = await import(modUrl);
       const r = await mod.solveExactLayer({
         L: v.L, W: v.W, a: v.a, b: v.b, gap: v.gap,
         currentCount: base.count, timeLimit: v.timeLimit

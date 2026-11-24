@@ -3,7 +3,7 @@
 **托盘码放测算台**  
 A responsive pallet loading calculator for iPhone, iPad and desktop.
 
-**v1.9：新增独立“精确优化单层”实验页（OR-Tools CP-SAT WebAssembly，默认不参与日常计算、离线不用）；多段对拼补空；电脑桌面原三栏工作台。**
+**v1.9.1：精确优化单层改用绝对模块地址，修复 Safari / 子路径下“无法解析模块”的报错；Safari 直接提示不支持；其余算法与布局同 v1.9。**
 
 > 目标部署地址：<https://taneli888.github.io/palletizer/>  
 > GitHub 仓库：<https://github.com/taneli888/palletizer>  
