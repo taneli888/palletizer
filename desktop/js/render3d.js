@@ -404,12 +404,15 @@
       ctx.closePath();
       ctx.fill();
     }
-    function dimPill(text, x, y, color) {
-      ctx.font = '600 10px "Segoe UI","Microsoft YaHei",sans-serif';
+    function dimPill(text, x, y, color, fontSize, vertical) {
+      ctx.save();
+      ctx.translate(x, y);
+      if (vertical) ctx.rotate(-Math.PI / 2);
+      ctx.font = '600 ' + fontSize + 'px "Segoe UI","Microsoft YaHei",sans-serif';
       var tw = ctx.measureText(text).width;
-      var bw = tw + 10, bh = 17;
-      var rx = x - bw / 2, ry = y - bh / 2;
-      ctx.fillStyle = 'rgba(9,14,19,.88)';
+      var bw = tw + fontSize * 1.15, bh = fontSize * 1.7;
+      var rx = -bw / 2, ry = -bh / 2;
+      ctx.fillStyle = 'rgba(9,14,19,.9)';
       ctx.strokeStyle = color;
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -424,31 +427,57 @@
       ctx.fillStyle = '#f5e9d5';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(text, x, y + 0.5);
+      ctx.fillText(text, 0, 0.5);
+      ctx.restore();
     }
     function drawDims(label) {
       var color = label.color || '#C99A5F';
+      var center = self._project(cam, [label.anchor.x, label.anchor.y, label.anchor.z]);
       (label.dims || []).forEach(function (d) {
         var a = self._project(cam, [d.a.x, d.a.y, d.a.z]);
         var b = self._project(cam, [d.b.x, d.b.y, d.b.z]);
         if (!a || !b) return;
+        var dx = b.x - a.x, dy = b.y - a.y;
+        var len = Math.hypot(dx, dy);
+        if (len < 6) return;
+        var nx = -dy / len, ny = dx / len;
+        var mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+        // 尺寸线朝箱体外侧偏移，避免压住箱面
+        if (center && (nx * (mid.x - center.x) + ny * (mid.y - center.y)) < 0) {
+          nx = -nx; ny = -ny;
+        }
+        var gap = Math.max(8, Math.min(18, len * 0.08));
+        var a2 = { x: a.x + nx * gap, y: a.y + ny * gap };
+        var b2 = { x: b.x + nx * gap, y: b.y + ny * gap };
         ctx.save();
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 1.2;
+        ctx.strokeStyle = 'rgba(138,75,34,.7)';
+        ctx.lineWidth = 0.8;
         ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b.x, b.y);
+        ctx.moveTo(a.x, a.y); ctx.lineTo(a2.x, a2.y);
+        ctx.moveTo(b.x, b.y); ctx.lineTo(b2.x, b2.y);
         ctx.stroke();
-        dimArrow(a, b, color);
-        dimArrow(b, a, color);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.1;
+        ctx.beginPath();
+        ctx.moveTo(a2.x, a2.y); ctx.lineTo(b2.x, b2.y);
+        ctx.stroke();
+        dimArrow(a2, b2, color);
+        dimArrow(b2, a2, color);
         ctx.restore();
-        dimPill(d.text, (a.x + b.x) / 2, (a.y + b.y) / 2 + (Math.abs(b.x - a.x) > Math.abs(b.y - a.y) ? -14 : 0), color);
+        var fontSize = Math.max(10, Math.min(19, len * 0.14));
+        var tx = (a2.x + b2.x) / 2 + nx * (fontSize * 0.95);
+        var ty = (a2.y + b2.y) / 2 + ny * (fontSize * 0.95);
+        var vertical = d.kind === 'h';
+        dimPill(d.text, tx, ty, color, fontSize, vertical);
       });
     }
     var self = this;
     for (var i = 0; i < labels.length; i++) {
       var label = labels[i];
-      drawDims(label);
+      if (label.dims && label.dims.length) {
+        drawDims(label);
+        continue;
+      }
       var p = this._project(cam, [label.anchor.x, label.anchor.y, label.anchor.z]);
       if (!p) continue;
       var text = String(label.text || '');

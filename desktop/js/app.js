@@ -791,8 +791,8 @@
           z: z
         },
         dims: [
-          { a: { x: r.wx, y: r.wy, z: z }, b: { x: r.wx + r.w, y: r.wy, z: z }, text: fmt(g.w) },
-          { a: { x: r.wx, y: r.wy, z: z }, b: { x: r.wx, y: r.wy + r.h, z: z }, text: fmt(g.h) }
+          { kind: 'w', a: { x: r.wx, y: r.wy, z: z }, b: { x: r.wx + r.w, y: r.wy, z: z }, text: fmt(g.w) },
+          { kind: 'h', a: { x: r.wx, y: r.wy, z: z }, b: { x: r.wx, y: r.wy + r.h, z: z }, text: fmt(g.h) }
         ]
       };
     });
@@ -834,9 +834,9 @@
         color: color,
         anchor: t.anchor,
         dims: [
-          { a: { x: t.anchor.x - t.w / 2, y: t.anchor.y - t.h / 2, z: t.anchor.z },
+          { kind: 'w', a: { x: t.anchor.x - t.w / 2, y: t.anchor.y - t.h / 2, z: t.anchor.z },
             b: { x: t.anchor.x + t.w / 2, y: t.anchor.y - t.h / 2, z: t.anchor.z }, text: fmt(t.w) },
-          { a: { x: t.anchor.x - t.w / 2, y: t.anchor.y - t.h / 2, z: t.anchor.z },
+          { kind: 'h', a: { x: t.anchor.x - t.w / 2, y: t.anchor.y - t.h / 2, z: t.anchor.z },
             b: { x: t.anchor.x - t.w / 2, y: t.anchor.y + t.h / 2, z: t.anchor.z }, text: fmt(t.h) }
         ]
       };
@@ -1024,19 +1024,19 @@
         '" stroke="#7c5127" stroke-width="0.55" vector-effect="non-scaling-stroke"/>');
     });
     (labels || []).forEach(function (lab) {
-      var fs = Math.max(5, Math.min(L, W) * 0.018);
+      var fs = Math.max(6, Math.min(20, Math.min(lab.w, lab.h) * 0.12));
       var midX = lab.x0 + lab.w / 2;
       var midY = lab.y0 + lab.h / 2;
-      var lineY = lab.y0 + lab.h * 0.72;
-      var lineX = lab.x0 + lab.w * 0.72;
+      var lineY = lab.y0 + lab.h * 0.82;
+      var lineX = lab.x0 + lab.w * 0.82;
       parts.push('<line x1="' + lab.x0 + '" y1="' + lineY + '" x2="' + (lab.x0 + lab.w) + '" y2="' + lineY +
         '" stroke="#8a4b22" stroke-width="0.7" vector-effect="non-scaling-stroke" marker-start="url(#dimArrow)" marker-end="url(#dimArrow)"/>');
       parts.push('<text x="' + midX + '" y="' + (lineY - fs * 0.45) + '" text-anchor="middle" font-size="' + fs +
         '" fill="#6b3a1c">' + esc(lab.wText) + '</text>');
       parts.push('<line x1="' + lineX + '" y1="' + lab.y0 + '" x2="' + lineX + '" y2="' + (lab.y0 + lab.h) +
         '" stroke="#8a4b22" stroke-width="0.7" vector-effect="non-scaling-stroke" marker-start="url(#dimArrow)" marker-end="url(#dimArrow)"/>');
-      parts.push('<text x="' + (lineX - fs * 0.4) + '" y="' + midY + '" text-anchor="end" dominant-baseline="middle" font-size="' + fs +
-        '" fill="#6b3a1c">' + esc(lab.hText) + '</text>');
+      parts.push('<text x="' + (lineX - fs * 0.55) + '" y="' + midY + '" text-anchor="middle" dominant-baseline="middle" font-size="' + fs +
+        '" fill="#6b3a1c" transform="rotate(-90 ' + (lineX - fs * 0.55) + ' ' + midY + ')">' + esc(lab.hText) + '</text>');
     });
     parts.push('</svg>');
     return parts.join('');
