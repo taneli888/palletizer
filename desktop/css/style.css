@@ -1176,6 +1176,19 @@ input[type="range"]::-moz-range-thumb { width: 11px; height: 11px; border-radius
 }
 
 /* 方案库 */
+.calc-dock {
+  position: sticky; bottom: 0; z-index: 8;
+  margin-top: 8px; padding: 10px 2px calc(8px + env(safe-area-inset-bottom));
+  background: linear-gradient(to top, var(--bg) 78%, rgba(238, 234, 225, 0));
+  border-top: 1px solid #ddd4c5;
+}
+.calc-btn { width: 100%; min-height: 42px; font-size: 14px; border-radius: 11px; }
+.calc-dirty {
+  display: block; margin-top: 6px; text-align: center; color: #8a5b22;
+  font-size: 10.5px; min-height: 14px;
+}
+.calc-dirty.ready { color: #1f6b4d; }
+
 .scheme-modal {
   position: fixed; inset: 0; z-index: 120; display: flex; align-items: center; justify-content: center;
   background: rgba(14, 20, 25, .46); padding: 24px;

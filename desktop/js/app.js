@@ -338,6 +338,7 @@
     fillForm();
     closeSchemeModal();
     recompute();
+    setCalcState('已调取方案：' + s.name, true);
     scheduleSave();
     toast('已调取方案：' + s.name);
   }
@@ -1240,18 +1241,35 @@
     return estimatedLayerBoxes() > 5000;
   }
 
+  function setCalcState(text, ready) {
+    var el = $('#calcDirty');
+    if (!el) return;
+    el.textContent = text || '';
+    el.classList.toggle('ready', !!ready);
+  }
+
   function onParamInput() {
     readForm();
-    if (inputIsTooDense()) {
-      toast('纸箱尺寸过小，单层箱数超过 5000；请确认尺寸后再计算');
-      scheduleSave();
-      return;
-    }
     if (skuIndex >= 0 && state.skus[skuIndex]) {
       state.skus[skuIndex] = clone(state.carton);
     }
+    scheduleSave();
+    setCalcState('参数已修改，点“开始计算”', false);
+  }
+
+  function calculateNow() {
+    readForm();
+    if (skuIndex >= 0 && state.skus[skuIndex]) {
+      state.skus[skuIndex] = clone(state.carton);
+    }
+    if (inputIsTooDense()) {
+      toast('纸箱尺寸过小，单层箱数超过 5000；请确认尺寸后再计算');
+      setCalcState('尺寸过小，已暂停计算', false);
+      return;
+    }
     clearTimeout(recomputeTimer);
-    recomputeTimer = setTimeout(function () { recompute(); }, 250);
+    recompute();
+    setCalcState('已按当前参数重新计算', true);
     scheduleSave();
   }
 
@@ -1925,7 +1943,7 @@
         $('#' + id).addEventListener('keydown', function (e) {
           if (e.key === 'Enter') {
             e.preventDefault();
-            e.target.blur();
+            calculateNow();
           }
         });
       });
@@ -1942,11 +1960,13 @@
     });
 
     $('#btnApplyPreview').addEventListener('click', applyPreview);
+    $('#btnCalculate').addEventListener('click', calculateNow);
     $('#onlyLayer').addEventListener('click', toggleOnly);
     $('#btnExitPallet').addEventListener('click', exitPalletView);
     $('#allowMix').addEventListener('change', function () {
       state.allowMix = this.checked;
-      recompute();
+      scheduleSave();
+      setCalcState('参数已修改，点“开始计算”', false);
     });
 
     $('#visibleRange').addEventListener('input', function () {
@@ -2094,6 +2114,7 @@
     scene = new Scene3D($('#scene'));
     bindEvents();
     recompute();
+    setCalcState('已显示基准方案；修改参数后点“开始计算”', true);
     setTimeout(function () { scene.resize(); }, 80);
   }
 

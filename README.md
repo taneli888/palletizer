@@ -3,7 +3,7 @@
 **托盘码放测算台**  
 A responsive pallet loading calculator for iPhone, iPad and desktop.
 
-**v1.9.8：桌面尺寸输入改为失焦 / Enter 后计算，避免输入到一半（例如 120 输成 1）触发超大计算卡死；单层超过 5000 箱时暂停计算；保留命名方案库。**
+**v1.9.9：桌面版改为显式“开始计算”按钮；输入尺寸时完全不触发计算，填好后点按钮才计算；保留 5000 箱密度保护、命名方案库和四臂风车。**
 
 > 目标部署地址：<https://taneli888.github.io/palletizer/>  
 > GitHub 仓库：<https://github.com/taneli888/palletizer>  
