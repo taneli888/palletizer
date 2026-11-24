@@ -1,10 +1,11 @@
 /* Palletizer 离线缓存 */
-const CACHE = 'palletizer-v1.4.0';
+const CACHE = 'palletizer-v1.5.0';
 const ASSETS = [
   './',
   './index.html',
   './css/mobile.css',
   './css/readability.css',
+  './css/responsive.css',
   './js/xlsx-lite.js',
   './js/core.js',
   './js/render3d.js',
