@@ -601,40 +601,18 @@
 
       if (!best) {
         best = cand;
-      } else {
-        var candPallets = qty > 0 ? Math.ceil(qty / cand.total) : 0;
-        var bestPallets = qty > 0 ? Math.ceil(qty / best.total) : 0;
-        var candExact = qty > 0 && qty % cand.layer.count === 0;
-        var bestExact = qty > 0 && qty % best.layer.count === 0;
-        if (candPallets < bestPallets ||
-            (candPallets === bestPallets && candExact && !bestExact) ||
-            (candPallets === bestPallets && candExact === bestExact && cand.total > best.total) ||
-            (candPallets === bestPallets && candExact === bestExact && cand.total === best.total && cand.rank < best.rank)) {
-          best = cand;
-        }
+      } else if (cand.total > best.total ||
+                 (cand.total === best.total && cand.rank < best.rank)) {
+        best = cand;
       }
     }
 
     for (var i = 0; i < ors.length; i++) {
       var o = ors[i];
+      o.index = i;
       var layer = solveLayer(effL, effW, o.a, o.b, cfg.gap);
       if (!layer.count) continue;
       addCandidate(o, layer);
-
-      // 风车数不一定能整除订单；尝试略少一箱但能整除的截取层，避免产生无谓尾层
-      if (layer.patternKey === 'pinwheel' && qty > 0 && layer.count > 2 && qty % layer.count !== 0) {
-        for (var n = layer.count - 1; n >= 2; n--) {
-          if (qty % n !== 0) continue;
-          var subLayer = Object.assign({}, layer, {
-            count: n,
-            rects: rectSubset(layer.rects, n),
-            pattern: layer.pattern,
-            patternKey: layer.patternKey
-          });
-          addCandidate(o, subLayer);
-          break;
-        }
-      }
     }
 
     if (!best) {
