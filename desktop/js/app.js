@@ -214,12 +214,57 @@
 
   /* ------------------------------ 主计算 ------------------------------ */
 
+  var LAYER_RULES_KEY = 'palletizer.layerRules.v1';
+
+  function loadLayerRules() {
+    try {
+      var data = JSON.parse(localStorage.getItem(LAYER_RULES_KEY) || '{}');
+      return Array.isArray(data.rules) ? data.rules : [];
+    } catch (e) { return []; }
+  }
+
+  function exactSolutionFor(cfg) {
+    var base = Core.solveStack(cfg);
+    if (!base || !base.ok || !base.orientation || base.orientation.key !== 'flat') return null;
+    var L = cfg.pallet.L + 2 * cfg.overhang - 2 * cfg.margin;
+    var W = cfg.pallet.W + 2 * cfg.overhang - 2 * cfg.margin;
+    var rules = loadLayerRules();
+    for (var i = 0; i < rules.length; i++) {
+      var r = rules[i];
+      if (Math.abs(Number(r.L) - L) > 0.5 || Math.abs(Number(r.W) - W) > 0.5) continue;
+      if (Math.abs(Number(r.a) - cfg.carton.l) > 0.5 || Math.abs(Number(r.b) - cfg.carton.w) > 0.5) continue;
+      if (Math.abs(Number(r.gap) - cfg.gap) > 0.01) continue;
+      if (!(r.count > 0) || !Array.isArray(r.rects) || r.rects.length !== r.count) continue;
+      var count = r.count;
+      var layers = base.layers;
+      if (cfg.maxLoad > 0 && cfg.carton.weight > 0) {
+        layers = Math.min(layers, Math.floor(cfg.maxLoad / (count * cfg.carton.weight)));
+      }
+      if (!(layers > 0)) return null;
+      var sol = Object.assign({}, base);
+      sol.perLayer = count;
+      sol.layers = layers;
+      sol.total = count * layers;
+      sol.layer = Object.assign({}, base.layer, {
+        count: count,
+        rects: r.rects.map(function (x) { return Object.assign({}, x); }),
+        pattern: '精确规则',
+        patternKey: 'exactRule'
+      });
+      sol.exactRule = true;
+      sol.ruleId = r.id || '';
+      return sol;
+    }
+    return null;
+  }
+
   function recompute(opts) {
     opts = opts || {};
     readForm();
     state.deltas = activeDeltas();
     var cfg = buildConfig();
-    var nextBase = Core.solveStack(cfg);
+    var exactBase = exactSolutionFor(cfg);
+    var nextBase = exactBase || Core.solveStack(cfg);
     var d = activeDeltas();
     var useDelta = d.L + d.W + d.H > 0;
     var dims = { L: cfg.pallet.L + d.L, W: cfg.pallet.W + d.W, H: cfg.pallet.H + d.H };
@@ -241,13 +286,17 @@
     var planCfgs = (state.skus.length ? state.skus : [state.carton]).map(function (sku) {
       return buildConfig(sku);
     });
+    var exactSols = planCfgs.map(exactSolutionFor);
+    var exactUsed = exactSols.some(Boolean);
     plan = Core.buildPlan(planCfgs, {
       allowMix: !!state.allowMix,
-      allowSmallBottom: !!state.opts.allowSmallBottom
+      allowSmallBottom: !!state.opts.allowSmallBottom,
+      solutions: exactSols
     });
-    if (state.opts.globalOptimize) {
+    if (state.opts.globalOptimize && !exactUsed) {
       plan = Core.buildGlobalPlan(planCfgs, plan);
     }
+    if (exactUsed && state.opts.globalOptimize) toast('已使用精确布局规则，本次跳过全局省托');
 
     if (!opts.skipAnalysis) ensureAnalysis(cfg);
     updateDeltaUI();
@@ -1462,7 +1511,7 @@
   function exportXlsx() {
     var list = state.skus.length ? state.skus : [state.carton];
     var cfgs = list.map(function (sku) { return buildConfig(sku); });
-    var p = Core.buildPlan(cfgs, { allowMix: !!state.allowMix });
+    var p = Core.buildPlan(cfgs, { allowMix: !!state.allowMix, solutions: cfgs.map(exactSolutionFor) });
 
     var infoRows = [[
       '纸箱名称', '订单数量', '单托上限', '整托数', '尾箱数', '参与托盘数', '说明'

@@ -1498,7 +1498,7 @@
 
     cfgs.forEach(function (cfg, si) {
       var qty = cfg.carton.qty;
-      var sol = solveStack(cfg);
+      var sol = options.solutions && options.solutions[si] ? options.solutions[si] : solveStack(cfg);
       var info = {
         index: si, name: cfg.carton.name, qty: qty, ok: sol.ok, sol: sol,
         fullPallets: 0, tailBoxes: 0, tailLayers: 0, absorbed: false,

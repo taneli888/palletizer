@@ -4,7 +4,7 @@
   var Core = window.PalletCore;
   var XL = window.XlsxLite;
   var KEY = 'palletizer.v1';
-  var VERSION = '1.9.1';
+  var VERSION = '1.9.2';
   var PALETTE = ['#C99A5F', '#9FB3A6', '#C7A6A0', '#B1A3C9', '#D1B280', '#8FA9B8'];
 
   var DEFAULTS = {
@@ -17,7 +17,8 @@
     opts: {
       gap: 0, margin: 0, sheet: 0, overhang: 0, maxLoad: 1000, maxLayers: 0,
       allowSide: false, allowUprightLay: false,
-      allowMix: true, allowSmallBottom: true, globalOptimize: false
+      allowMix: true, allowSmallBottom: true, globalOptimize: false,
+      useExactRules: true
     },
     fontSize: 'normal'
   };
@@ -68,6 +69,7 @@
         ['allowSide', 'allowUprightLay', 'allowMix', 'allowSmallBottom', 'globalOptimize'].forEach(function (k) {
           if (saved.opts[k] != null) s.opts[k] = !!saved.opts[k];
         });
+        if (saved.opts.useExactRules != null) s.opts.useExactRules = !!saved.opts.useExactRules;
       }
       if (Array.isArray(saved.cartons) && saved.cartons.length) {
         s.cartons = saved.cartons.filter(function (c) {
@@ -170,6 +172,15 @@
     $('#allowMix').checked = !!state.opts.allowMix;
     $('#allowSmallBottom').checked = !!state.opts.allowSmallBottom;
     $('#globalOptimize').checked = !!state.opts.globalOptimize;
+    if ($('#useExactRules')) $('#useExactRules').checked = state.opts.useExactRules !== false;
+    syncExactRuleInfo();
+  }
+
+  function syncExactRuleInfo() {
+    var el = $('#exactRuleInfo');
+    if (!el) return;
+    var n = loadLayerRules().length;
+    el.textContent = n ? ('已保存 ' + n + ' 条规则；匹配时自动使用') : '还没有保存规则';
   }
 
   function renderCartons() {
@@ -280,6 +291,67 @@
     });
   }
 
+  var RULES_KEY = 'palletizer.layerRules.v1';
+
+  function loadLayerRules() {
+    try {
+      var data = JSON.parse(localStorage.getItem(RULES_KEY) || '{}');
+      return Array.isArray(data.rules) ? data.rules : [];
+    } catch (e) { return []; }
+  }
+
+  function ruleFor(cfg, sol) {
+    if (!sol || !sol.ok || !sol.orientation || sol.orientation.key !== 'flat') return null;
+    var L = cfg.pallet.L + 2 * cfg.overhang - 2 * cfg.margin;
+    var W = cfg.pallet.W + 2 * cfg.overhang - 2 * cfg.margin;
+    var rules = loadLayerRules();
+    for (var i = 0; i < rules.length; i++) {
+      var r = rules[i];
+      if (Math.abs(Number(r.L) - L) > 0.5 || Math.abs(Number(r.W) - W) > 0.5) continue;
+      if (Math.abs(Number(r.a) - cfg.carton.l) > 0.5 || Math.abs(Number(r.b) - cfg.carton.w) > 0.5) continue;
+      if (Math.abs(Number(r.gap) - cfg.gap) > 0.01) continue;
+      if (!(r.count > 0) || !Array.isArray(r.rects) || r.rects.length !== r.count) continue;
+      return r;
+    }
+    return null;
+  }
+
+  function exactSolution(cfg) {
+    var base = Core.solveStack(cfg);
+    var rule = ruleFor(cfg, base);
+    if (!rule) return null;
+    var count = rule.count;
+    var layers = base.layers;
+    if (cfg.maxLoad > 0 && cfg.carton.weight > 0) {
+      layers = Math.min(layers, Math.floor(cfg.maxLoad / (count * cfg.carton.weight)));
+    }
+    if (!(layers > 0)) return null;
+    var sol = Object.assign({}, base);
+    sol.perLayer = count;
+    sol.layers = layers;
+    sol.total = count * layers;
+    sol.layer = Object.assign({}, base.layer, {
+      count: count,
+      rects: rule.rects.map(function (r) { return Object.assign({}, r); }),
+      pattern: '精确规则',
+      patternKey: 'exactRule'
+    });
+    sol.exactRule = true;
+    sol.ruleId = rule.id || '';
+    return sol;
+  }
+
+  function exactSolutions(cfgs) {
+    if (state.opts.useExactRules === false) return { list: cfgs.map(function () { return null; }), used: 0 };
+    var used = 0;
+    var list = cfgs.map(function (cfg) {
+      var sol = exactSolution(cfg);
+      if (sol) used++;
+      return sol;
+    });
+    return { list: list, used: used };
+  }
+
   function compute(goPlan) {
     readPalletInputs();
     readAdvanced();
@@ -296,11 +368,14 @@
       return;
     }
     planCfgs = cfgs;
+    var exact = exactSolutions(cfgs);
     plan = Core.buildPlan(cfgs, {
       allowMix: !!state.opts.allowMix,
-      allowSmallBottom: !!state.opts.allowSmallBottom
+      allowSmallBottom: !!state.opts.allowSmallBottom,
+      solutions: exact.list
     });
-    if (state.opts.globalOptimize) plan = Core.buildGlobalPlan(cfgs, plan);
+    if (state.opts.globalOptimize && !exact.used) plan = Core.buildGlobalPlan(cfgs, plan);
+    if (exact.used && state.opts.globalOptimize) toast('已使用精确布局规则，本次跳过全局省托');
     planDirty = false;
     saveState();
     var hint = $('#inputHint');
@@ -832,7 +907,7 @@
     ['optGap', 'optMargin', 'optSheet', 'optOverhang', 'optMaxLoad', 'optMaxLayers'].forEach(function (id) {
       $('#' + id).addEventListener('change', readAdvanced);
     });
-    ['allowSide', 'allowUprightLay', 'allowMix', 'allowSmallBottom', 'globalOptimize'].forEach(function (id) {
+    ['allowSide', 'allowUprightLay', 'allowMix', 'allowSmallBottom', 'globalOptimize', 'useExactRules'].forEach(function (id) {
       $('#' + id).addEventListener('change', function () {
         state.opts[id] = $('#' + id).checked;
         saveState();
@@ -891,6 +966,12 @@
       if (badge) badge.textContent = '可安装 · 浏览器菜单里选择“安装应用”';
     });
   }
+
+  window.addEventListener('pageshow', function () {
+    if (!plan) return;
+    syncExactRuleInfo();
+    compute(false);
+  });
 
   document.addEventListener('DOMContentLoaded', init);
 })();

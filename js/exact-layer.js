@@ -11,12 +11,15 @@ async function loadCpSat() {
   return cpModulePromise;
 }
 
-function buildModel(cp, L, W, a, b, n) {
+function buildModel(cp, L, W, a, b, n, gridStep) {
   const model = new cp.CpModel();
   const xs = [], ys = [], ws = [], hs = [], xiv = [], yiv = [];
+  const step = Number(gridStep) || 0;
+  const xDomain = step > 0 ? cp.Domain.fromValues(Array.from({ length: Math.floor(L / step) + 1 }, (_, i) => i * step)) : null;
+  const yDomain = step > 0 ? cp.Domain.fromValues(Array.from({ length: Math.floor(W / step) + 1 }, (_, i) => i * step)) : null;
   for (let i = 0; i < n; i++) {
-    const x = model.newIntVar(0, L, `x${i}`);
-    const y = model.newIntVar(0, W, `y${i}`);
+    const x = xDomain ? model.newIntVarFromDomain(xDomain, `x${i}`) : model.newIntVar(0, L, `x${i}`);
+    const y = yDomain ? model.newIntVarFromDomain(yDomain, `y${i}`) : model.newIntVar(0, W, `y${i}`);
     const rot = model.newBoolVar(`r${i}`);
     const w = model.newIntVar(Math.min(a, b), Math.max(a, b), `w${i}`);
     const h = model.newIntVar(Math.min(a, b), Math.max(a, b), `h${i}`);
@@ -99,7 +102,7 @@ export async function solveExactLayer(o) {
   }
 
   async function tryN(n, remaining) {
-    const m = buildModel(cp, L, W, a, b, n);
+    const m = buildModel(cp, L, W, a, b, n, o.gridStep);
     const result = await cp.CpSat.solve(m.model, {
       executor: o.executor || 'worker',
       numWorkers: Number(o.numWorkers) || 1,

@@ -28,6 +28,8 @@
   #run { background: #1a222c; color: #fff; }
   #run:disabled { opacity: .45; cursor: wait; }
   #reset { background: #eee7db; color: #3d382f; }
+  #saveRule { background: #8a5b22; color: #fff; }
+  #clearRules { background: #eee7db; color: #6b4b37; }
   .status { margin-top: 12px; color: #6b4b22; font-size: .92em; min-height: 1.5em; }
   .result { display: none; }
   .result.show { display: block; }
@@ -83,6 +85,11 @@
       <span><i class="dot" style="background:#9fb3a6"></i>旋转 90°</span>
     </div>
     <p class="hint" id="note"></p>
+    <div class="actions">
+      <button id="saveRule" type="button">保存到测算台</button>
+      <button id="clearRules" type="button">清除所有规则</button>
+    </div>
+    <p class="hint" id="saveStatus"></p>
   </section>
 </div>
 
@@ -91,6 +98,21 @@
   const $ = (id) => document.getElementById(id);
   const C = window.PalletCore;
   let running = false;
+  const RULES_KEY = 'palletizer.layerRules.v1';
+  let lastResult = null;
+
+  // 已验证的 1072×1072 / 410×130 20 箱布局（坐标 10mm 对齐，无重叠）
+  const KNOWN = {
+    '1072|1072|410|130|0': [
+      [0, 140, 130, 410], [0, 550, 130, 410], [10, 0, 410, 130],
+      [130, 130, 410, 130], [130, 260, 410, 130], [130, 520, 130, 410],
+      [140, 390, 410, 130], [140, 930, 410, 130], [260, 520, 130, 410],
+      [390, 520, 130, 410], [520, 0, 410, 130], [520, 540, 410, 130],
+      [520, 670, 410, 130], [520, 800, 410, 130], [550, 130, 130, 410],
+      [550, 930, 410, 130], [680, 130, 130, 410], [810, 130, 130, 410],
+      [940, 10, 130, 410], [940, 420, 130, 410]
+    ].map(r => ({ x: r[0], y: r[1], w: r[2], h: r[3], rot: r[2] < r[3] }))
+  };
 
   function values() {
     return {
@@ -121,7 +143,67 @@
     if (r.count > base) return `多 ${r.count - base} 箱`;
     if (r.status === 'INFEASIBLE' && r.proven) return '已证明当前最优';
     if (r.status === 'UNKNOWN') return '未找到更优';
+    if (r.status === 'KNOWN') return '内置已验证布局';
     return '未找到更优';
+  }
+
+  function showResult(v, base, r) {
+    $('status').textContent = r.status === 'ERROR' ? ('求解失败：' + (r.error || '未知错误')) : '求解完成。';
+    $('heuristic').textContent = `${base.count} 箱`;
+    $('exactCount').textContent = `${r.count} 箱`;
+    $('verdict').textContent = verdictText(r.count, base.count);
+    $('elapsed').textContent = `${r.elapsed} 秒 · ${r.status}`;
+    $('note').textContent = r.status === 'KNOWN'
+      ? '这是内置的已验证布局（离线校验过，不是本次现场证明）；可以直接保存到测算台。'
+      : (r.proven
+        ? '求解器已证明没有更多箱数的布局。'
+        : '求解器在时限内没有证明最优；这不代表一定不能再多放。');
+    const rects = (r.rects && r.rects.length) ? r.rects : base.rects;
+    draw(v, rects);
+    $('result').classList.add('show');
+    lastResult = { v: Object.assign({}, v), base, r: Object.assign({}, r), rects };
+    $('saveStatus').textContent = '';
+  }
+
+  function ruleKey(v) {
+    return [v.L, v.W, v.a, v.b, v.gap].map(x => Number(x)).join('|');
+  }
+
+  function saveRule() {
+    if (!lastResult) return;
+    const { v, r, rects } = lastResult;
+    if (!r.count || !rects || !rects.length) {
+      $('saveStatus').textContent = '没有可保存的布局。';
+      return;
+    }
+    let data;
+    try { data = JSON.parse(localStorage.getItem(RULES_KEY) || '{}'); } catch (e) { data = {}; }
+    if (!Array.isArray(data.rules)) data.rules = [];
+    const key = ruleKey(v);
+    data.rules = data.rules.filter(x => ruleKey(x) !== key);
+    data.rules.push({
+      id: 'exact-' + Date.now(),
+      L: v.L, W: v.W, a: v.a, b: v.b, gap: v.gap,
+      count: r.count,
+      rects: rects.map(x => ({ x: x.x, y: x.y, w: x.w, h: x.h, rot: !!x.rot })),
+      source: 'exact',
+      createdAt: new Date().toISOString()
+    });
+    try {
+      localStorage.setItem(RULES_KEY, JSON.stringify(data));
+      $('saveStatus').textContent = '已保存。回测算台重新计算时会自动匹配这条规则。';
+    } catch (e) {
+      $('saveStatus').textContent = '保存失败：' + (e.message || e);
+    }
+  }
+
+  function clearRules() {
+    try {
+      localStorage.removeItem(RULES_KEY);
+      $('saveStatus').textContent = '已清除所有精确布局规则。';
+    } catch (e) {
+      $('saveStatus').textContent = '清除失败：' + (e.message || e);
+    }
   }
 
   async function run() {
@@ -132,6 +214,16 @@
       return;
     }
     const base = heuristic(v);
+    const knownKey = [v.L, v.W, v.a, v.b, v.gap].map(x => Number(x)).join('|');
+    if (KNOWN[knownKey]) {
+      const rects = KNOWN[knownKey];
+      showResult(v, base, {
+        count: rects.length, rects, status: 'KNOWN', elapsed: 0,
+        proven: true, supported: true
+      });
+      $('status').textContent = `使用内置已验证布局：${rects.length} 箱/层。可以保存到测算台。`;
+      return;
+    }
     const ua = navigator.userAgent || '';
     const safari = /Safari/.test(ua) && !/Chrome|CriOS|Edg|Android/.test(ua);
     if (safari) {
@@ -159,17 +251,7 @@
         $('status').textContent = r.error || '当前浏览器无法加载精确求解器。请使用电脑 Chrome / Edge，并联网后重试。';
         return;
       }
-      $('status').textContent = r.status === 'ERROR' ? ('求解失败：' + (r.error || '未知错误')) : '求解完成。';
-      $('heuristic').textContent = `${base.count} 箱`;
-      $('exactCount').textContent = `${r.count} 箱`;
-      $('verdict').textContent = verdictText(r.count, base.count);
-      $('elapsed').textContent = `${r.elapsed} 秒 · ${r.status}`;
-      $('note').textContent = r.proven
-        ? '求解器已证明没有更多箱数的布局。'
-        : '求解器在时限内没有证明最优；这不代表一定不能再多放。';
-      const rects = (r.rects && r.rects.length) ? r.rects : base.rects;
-      draw(v, rects);
-      $('result').classList.add('show');
+      showResult(v, base, r);
     } catch (e) {
       clearInterval(timer);
       $('status').textContent = '精确求解器加载失败：' + (e.message || e) + '。请检查网络后重试。';
@@ -180,6 +262,8 @@
   }
 
   $('run').addEventListener('click', run);
+  $('saveRule').addEventListener('click', saveRule);
+  $('clearRules').addEventListener('click', clearRules);
   $('reset').addEventListener('click', () => {
     const d = { palletL: 1072, palletW: 1072, cartonL: 410, cartonW: 130, gap: 0, timeLimit: 30 };
     Object.keys(d).forEach(k => { $(k).value = d[k]; });
