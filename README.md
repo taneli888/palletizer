@@ -3,7 +3,7 @@
 **托盘码放测算台**  
 A responsive pallet loading calculator for iPhone, iPad and desktop.
 
-**v1.8：多段对拼补空（1072 / 410×130 从 18 提升到 19 箱/层）；电脑桌面原三栏工作台；iPhone / iPad 手机版布局。**
+**v1.9：新增独立“精确优化单层”实验页（OR-Tools CP-SAT WebAssembly，默认不参与日常计算、离线不用）；多段对拼补空；电脑桌面原三栏工作台。**
 
 > 目标部署地址：<https://taneli888.github.io/palletizer/>  
 > GitHub 仓库：<https://github.com/taneli888/palletizer>  
@@ -92,6 +92,7 @@ https://taneli888.github.io/palletizer/desktop/
 - 桌面版是宽屏三栏，手机版是单列 + 底部 Tab；
 - 手机版默认示例改成 1072×1072、3 种纸箱，打开即可看到混托 / 3D；
 - 核心计算直接复用桌面版的 `core.js`：分层、风车拼花、**多段对拼补空**、同层混装、全局省托、托盘高度都一致；
+- **精确优化单层**是单独的 `exact.html` 实验页；默认关闭、不参与日常方案，只有主动打开才加载 OR-Tools WebAssembly；
 
 单层算法会同时比较顺排、旋转、对拼、行列混排、多段对拼和风车。比如 1072×1072 托盘放 410×130 纸箱：
 
@@ -99,6 +100,22 @@ https://taneli888.github.io/palletizer/desktop/
 - 多段对拼会在一条带里再切一段，把残留区域补上，得到 **19 箱/层**。
 
 ![1072×1072 放 410×130：多段对拼 19 箱/层](docs/gapfill-1072.png)
+
+## 精确优化单层（实验，默认关闭）
+
+单独打开：
+
+```
+https://taneli888.github.io/palletizer/exact.html
+```
+
+- 使用 OR-Tools CP-SAT WebAssembly，仅在你主动点击时加载；
+- 不参与手机版 / 桌面版的日常计算，离线时不要使用；
+- 首次需要联网加载约 8–20MB 求解器资源，手机 Safari 可能不支持；
+- 只做单层二维排布，不会自动改整托方案；
+- 结果会显示“已证明最优 / 找到更多 / 时限内未证明”，不会把未证明的结果说成最优。
+
+日常测算仍然使用本地的多段对拼启发式，速度不受影响。
 - 手机版没有桌面版的放量推荐曲线，保留了最常用的装托、混托、3D、导入导出。
 
 ## 目录

@@ -1,5 +1,5 @@
 /* Palletizer 离线缓存 */
-const CACHE = 'palletizer-v1.8.0';
+const CACHE = 'palletizer-v1.9.0';
 const ASSETS = [
   './',
   './index.html',
@@ -43,6 +43,10 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
+  // 精确求解器体积大、只在线使用，不经过离线缓存
+  if (url.pathname.endsWith('/exact.html') ||
+      url.pathname.endsWith('/js/exact-layer.js') ||
+      url.pathname.includes('/vendor/cp-sat/')) return;
 
   event.respondWith(
     caches.match(req).then((cached) => {

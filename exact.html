@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#161d23">
+<title>精确优化单层 · Palletizer</title>
+<link rel="stylesheet" href="css/readability.css">
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: #e9e5dc; color: #18202a;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: calc(16px * var(--fs, 1)); line-height: 1.55;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 22px 18px 56px; }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+  .top h1 { font-size: 1.45em; margin: 0; }
+  .top a { color: #8a5b22; font-weight: 650; text-decoration: none; }
+  .card { background: #fbf8f1; border: 1px solid #d8d1c2; border-radius: 18px; padding: 18px; margin-bottom: 14px; box-shadow: 0 12px 26px rgba(35,31,24,.06); }
+  .grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
+  label.field { display: flex; flex-direction: column; gap: 5px; font-size: .9em; color: #5a5449; }
+  input { width: 100%; border: 1px solid #cfc6b5; border-radius: 10px; background: #fffdf8; padding: 10px 11px; font: inherit; color: #18202a; }
+  .hint { color: #6f675a; font-size: .88em; margin: 10px 0 0; }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+  button { border: 0; border-radius: 12px; padding: 11px 16px; font: inherit; font-weight: 700; cursor: pointer; }
+  #run { background: #1a222c; color: #fff; }
+  #run:disabled { opacity: .45; cursor: wait; }
+  #reset { background: #eee7db; color: #3d382f; }
+  .status { margin-top: 12px; color: #6b4b22; font-size: .92em; min-height: 1.5em; }
+  .result { display: none; }
+  .result.show { display: block; }
+  .kpis { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; margin: 6px 0 14px; }
+  .kpi { background: #f4efe5; border-radius: 12px; padding: 10px 12px; }
+  .kpi span { display: block; font-size: .8em; color: #746b5c; }
+  .kpi b { display: block; font-size: 1.35em; margin-top: 2px; }
+  .kpi b small { font-size: .58em; font-weight: 600; color: #746b5c; }
+  .svg-wrap { background: #ece5d8; border-radius: 14px; padding: 10px; }
+  svg { display: block; width: 100%; height: auto; border-radius: 8px; background: #f8f3e9; }
+  .legend { display: flex; gap: 16px; font-size: .82em; color: #675e50; margin-top: 8px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+  @media (max-width: 620px) {
+    .wrap { padding: 16px 12px 40px; }
+    .grid { grid-template-columns: 1fr; }
+    .kpis { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>精确优化单层</h1>
+    <a href="index.html">← 返回测算台</a>
+  </header>
+
+  <section class="card">
+    <div class="grid">
+      <label class="field"><span>托盘长 mm</span><input id="palletL" type="number" min="1" step="1" value="1072"></label>
+      <label class="field"><span>托盘宽 mm</span><input id="palletW" type="number" min="1" step="1" value="1072"></label>
+      <label class="field"><span>纸箱长 mm</span><input id="cartonL" type="number" min="1" step="1" value="410"></label>
+      <label class="field"><span>纸箱宽 mm</span><input id="cartonW" type="number" min="1" step="1" value="130"></label>
+      <label class="field"><span>箱间间隙 mm</span><input id="gap" type="number" min="0" step="1" value="0"></label>
+      <label class="field"><span>求解时限 秒</span><input id="timeLimit" type="number" min="5" max="120" step="5" value="30"></label>
+    </div>
+    <p class="hint">这是独立实验页，不参与手机版 / 桌面版的日常计算。首次使用需要联网加载 OR-Tools WebAssembly（约 8–20MB），离线时不要使用。手机 Safari 可能不支持。</p>
+    <div class="actions">
+      <button id="run" type="button">开始精确求解</button>
+      <button id="reset" type="button">恢复示例</button>
+    </div>
+    <div class="status" id="status">等待开始。当前算法会先给出一个可行布局，再尝试多放 1 箱。</div>
+  </section>
+
+  <section class="card result" id="result">
+    <div class="kpis">
+      <div class="kpi"><span>当前启发式</span><b id="heuristic">—</b></div>
+      <div class="kpi"><span>精确优化</span><b id="exactCount">—</b></div>
+      <div class="kpi"><span>结论</span><b id="verdict">—</b><small id="elapsed"></small></div>
+    </div>
+    <div class="svg-wrap"><svg id="layout" viewBox="0 0 100 100" role="img" aria-label="单层排布"></svg></div>
+    <div class="legend">
+      <span><i class="dot" style="background:#c99a5f"></i>平放</span>
+      <span><i class="dot" style="background:#9fb3a6"></i>旋转 90°</span>
+    </div>
+    <p class="hint" id="note"></p>
+  </section>
+</div>
+
+<script src="js/core.js"></script>
+<script type="module">
+  const $ = (id) => document.getElementById(id);
+  const C = window.PalletCore;
+  let running = false;
+
+  function values() {
+    return {
+      L: Number($('palletL').value), W: Number($('palletW').value),
+      a: Number($('cartonL').value), b: Number($('cartonW').value),
+      gap: Math.max(0, Number($('gap').value) || 0),
+      timeLimit: Math.max(5, Math.min(120, Number($('timeLimit').value) || 30))
+    };
+  }
+
+  function heuristic(v) {
+    return C.solveLayer(v.L, v.W, v.a, v.b, v.gap);
+  }
+
+  function draw(v, rects) {
+    const svg = $('layout');
+    svg.setAttribute('viewBox', `0 0 ${v.L} ${v.W}`);
+    let s = `<rect x="0" y="0" width="${v.L}" height="${v.W}" fill="#f8f3e9" stroke="#b9aa96" stroke-width="${Math.max(1, v.L / 500)}"/>`;
+    rects.forEach(r => {
+      s += `<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}"
+        fill="${r.w > r.h ? '#c99a5f' : '#9fb3a6'}" stroke="#26313a"
+        stroke-width="${Math.max(1, v.L / 900)}"/>`;
+    });
+    svg.innerHTML = s;
+  }
+
+  function verdictText(r, base) {
+    if (r.count > base) return `多 ${r.count - base} 箱`;
+    if (r.status === 'INFEASIBLE' && r.proven) return '已证明当前最优';
+    if (r.status === 'UNKNOWN') return '未找到更优';
+    return '未找到更优';
+  }
+
+  async function run() {
+    if (running) return;
+    const v = values();
+    if (!(v.L > 0 && v.W > 0 && v.a > 0 && v.b > 0)) {
+      $('status').textContent = '请填写有效的托盘和纸箱尺寸。';
+      return;
+    }
+    const base = heuristic(v);
+    running = true;
+    $('run').disabled = true;
+    $('result').classList.remove('show');
+    $('status').textContent = `启发式每层 ${base.count} 箱；正在加载精确求解器……首次可能需要几秒。`;
+    const t0 = performance.now();
+    const timer = setInterval(() => {
+      const sec = ((performance.now() - t0) / 1000).toFixed(0);
+      $('status').textContent = `启发式每层 ${base.count} 箱；精确求解中……已 ${sec} 秒（上限 ${v.timeLimit} 秒）`;
+    }, 1000);
+    try {
+      const mod = await import(`./js/exact-layer.js?v=1.9.0`);
+      const r = await mod.solveExactLayer({
+        L: v.L, W: v.W, a: v.a, b: v.b, gap: v.gap,
+        currentCount: base.count, timeLimit: v.timeLimit
+      });
+      clearInterval(timer);
+      if (!r.supported) {
+        $('status').textContent = r.error || '当前浏览器无法加载精确求解器。请使用电脑 Chrome / Edge，并联网后重试。';
+        return;
+      }
+      $('status').textContent = r.status === 'ERROR' ? ('求解失败：' + (r.error || '未知错误')) : '求解完成。';
+      $('heuristic').textContent = `${base.count} 箱`;
+      $('exactCount').textContent = `${r.count} 箱`;
+      $('verdict').textContent = verdictText(r.count, base.count);
+      $('elapsed').textContent = `${r.elapsed} 秒 · ${r.status}`;
+      $('note').textContent = r.proven
+        ? '求解器已证明没有更多箱数的布局。'
+        : '求解器在时限内没有证明最优；这不代表一定不能再多放。';
+      const rects = (r.rects && r.rects.length) ? r.rects : base.rects;
+      draw(v, rects);
+      $('result').classList.add('show');
+    } catch (e) {
+      clearInterval(timer);
+      $('status').textContent = '精确求解器加载失败：' + (e.message || e) + '。请检查网络后重试。';
+    } finally {
+      running = false;
+      $('run').disabled = false;
+    }
+  }
+
+  $('run').addEventListener('click', run);
+  $('reset').addEventListener('click', () => {
+    const d = { palletL: 1072, palletW: 1072, cartonL: 410, cartonW: 130, gap: 0, timeLimit: 30 };
+    Object.keys(d).forEach(k => { $(k).value = d[k]; });
+    $('status').textContent = '已恢复示例。';
+    $('result').classList.remove('show');
+  });
+</script>
+</body>
+</html>

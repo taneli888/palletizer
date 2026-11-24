@@ -208,6 +208,7 @@ svg { width: 22px; height: 22px; display: block; }
   text-align: left; padding: 8px 0;
 }
 .list-btn:first-of-type { border-top: 0; }
+a.list-btn { text-decoration: none; color: inherit; }
 .list-btn span { font-size: 14px; font-weight: 600; }
 .list-btn em { font-style: normal; font-size: 10px; color: var(--faint); }
 .list-btn.danger span { color: var(--danger); }
