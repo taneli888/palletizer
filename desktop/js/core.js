@@ -284,6 +284,52 @@
     return { count: rects.length, rects: rects, usedW: bd.w, usedH: bd.h };
   }
 
+  /* 四臂风车：四条边各放一排箱子，中间留空，适合 20 箱这类“5+5+5+5” */
+  function windmillPattern(L, W, a, b, gap) {
+    gap = Math.max(0, n(gap));
+    if (!(L > 2 * a) || !(W > 2 * a)) return null;
+    var pitch = b + gap;
+    var nh = floorFit(L - a, b, gap);
+    var nv = floorFit(W - a, b, gap);
+    if (!nh || !nv) return null;
+    var armH = nh * b + Math.max(0, nh - 1) * gap;
+    var armV = nv * b + Math.max(0, nv - 1) * gap;
+    // 四条臂分别从四个角向内伸出
+    var topX = L - a - armH;
+    var bottomX = a;
+    var leftY = W - a - armV;
+    var rightY = a;
+    if (topX < -EPS || bottomX + armH > L + EPS) return null;
+    if (leftY < -EPS || rightY + armV > W + EPS) return null;
+    var rects = [];
+    var i;
+    for (i = 0; i < nh; i++) {
+      // 上下两臂：箱子旋转 90°，沿托盘长边排
+      rects.push(makeRect(topX + i * pitch, W - a, b, a, true));
+      rects.push(makeRect(bottomX + i * pitch, 0, b, a, true));
+    }
+    for (i = 0; i < nv; i++) {
+      // 左右两臂：箱子平放，沿托盘宽边排
+      rects.push(makeRect(0, leftY + i * pitch, a, b, false));
+      rects.push(makeRect(L - a, rightY + i * pitch, a, b, false));
+    }
+    // 校验越界/重叠，避免特殊尺寸下拼出无效布局
+    var ok = true;
+    for (i = 0; i < rects.length && ok; i++) {
+      var r = rects[i];
+      if (r.x < -EPS || r.y < -EPS || r.x + r.w > L + EPS || r.y + r.h > W + EPS) { ok = false; break; }
+      for (var j = i + 1; j < rects.length; j++) {
+        var s = rects[j];
+        var ox = Math.min(r.x + r.w, s.x + s.w) - Math.max(r.x, s.x);
+        var oy = Math.min(r.y + r.h, s.y + s.h) - Math.max(r.y, s.y);
+        if (ox > EPS && oy > EPS) { ok = false; break; }
+      }
+    }
+    if (!ok) return null;
+    var bd = bounds(rects);
+    return { count: rects.length, rects: rects, usedW: bd.w, usedH: bd.h };
+  }
+
   /* 风车拼花：4 箱围成一个 (a+b) 方块，可平铺，空档补顺排 */
   function pinwheelPattern(L, W, a, b, gap) {
     var block = a + b + gap;     // 一个风车方块（含内部间隙）的边长
@@ -369,6 +415,7 @@
     add(splitPattern(L, W, a, b, gap, true), '纵向对拼', 'splitX', 4);
     add(splitPattern(L, W, a, b, gap, false), '横向对拼', 'splitY', 4);
     add(guillotinePattern(L, W, a, b, gap, 2), '多段对拼', 'guillotine', 4);
+    add(windmillPattern(L, W, a, b, gap), '风车拼花', 'pinwheel', 2);
     add(stripPattern(L, W, a, b, gap, true), '横向混排', 'rows', 3);
     add(stripPattern(L, W, a, b, gap, false), '纵向混排', 'cols', 3);
     add(pinwheelPattern(L, W, a, b, gap), '风车拼花', 'pinwheel', 2);
@@ -510,15 +557,12 @@
 
     var ors = orientations(cfg);
     var best = null;
+    var qty = cfg.carton.qty;
 
-    for (var i = 0; i < ors.length; i++) {
-      var o = ors[i];
-      var layer = solveLayer(effL, effW, o.a, o.b, cfg.gap);
-      if (!layer.count) continue;
-
+    function addCandidate(o, layer) {
       var pitch = o.thickness + cfg.sheet;
       var layers = Math.floor((H + cfg.sheet + EPS) / pitch);
-      if (!layers) continue;
+      if (!layers) return;
 
       var capByLayer = cfg.maxLayers > 0 ? cfg.maxLayers : Infinity;
       var capByWeight = Infinity;
@@ -534,7 +578,7 @@
           result.warnings.push('受最大堆叠层数限制，层数由 ' + rawLayers + ' 层降为 ' + layers + ' 层。');
         }
       }
-      if (layers <= 0) continue;
+      if (layers <= 0) return;
 
       var total = layers * layer.count;
       var usedHeight = layers * o.thickness + Math.max(0, layers - 1) * cfg.sheet;
@@ -551,13 +595,45 @@
         weight: weight,
         areaUtil: layer.count * o.a * o.b / (effL * effW),
         volUtil: vol / (L * W * H),
-        rank: i
+        rank: o.index != null ? o.index : 0
       };
       result.candidates.push(cand);
 
-      if (!best || cand.total > best.total ||
-          (cand.total === best.total && cand.rank < best.rank)) {
+      if (!best) {
         best = cand;
+      } else {
+        var candPallets = qty > 0 ? Math.ceil(qty / cand.total) : 0;
+        var bestPallets = qty > 0 ? Math.ceil(qty / best.total) : 0;
+        var candExact = qty > 0 && qty % cand.layer.count === 0;
+        var bestExact = qty > 0 && qty % best.layer.count === 0;
+        if (candPallets < bestPallets ||
+            (candPallets === bestPallets && candExact && !bestExact) ||
+            (candPallets === bestPallets && candExact === bestExact && cand.total > best.total) ||
+            (candPallets === bestPallets && candExact === bestExact && cand.total === best.total && cand.rank < best.rank)) {
+          best = cand;
+        }
+      }
+    }
+
+    for (var i = 0; i < ors.length; i++) {
+      var o = ors[i];
+      var layer = solveLayer(effL, effW, o.a, o.b, cfg.gap);
+      if (!layer.count) continue;
+      addCandidate(o, layer);
+
+      // 风车数不一定能整除订单；尝试略少一箱但能整除的截取层，避免产生无谓尾层
+      if (layer.patternKey === 'pinwheel' && qty > 0 && layer.count > 2 && qty % layer.count !== 0) {
+        for (var n = layer.count - 1; n >= 2; n--) {
+          if (qty % n !== 0) continue;
+          var subLayer = Object.assign({}, layer, {
+            count: n,
+            rects: rectSubset(layer.rects, n),
+            pattern: layer.pattern,
+            patternKey: layer.patternKey
+          });
+          addCandidate(o, subLayer);
+          break;
+        }
       }
     }
 
@@ -585,7 +661,6 @@
       result.layer.rects[r].wy = result.layer.rects[r].y + originY;
     }
 
-    var qty = cfg.carton.qty;
     if (qty > 0) {
       result.pallets = Math.ceil(qty / result.total);
       result.lastCount = qty - (result.pallets - 1) * result.total;
