@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Palletizer 桌面版 · 托盘码放测算台</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23161d23'/%3E%3Cpath d='M16 5 27 11 16 17 5 11Z' fill='%23E9B872'/%3E%3Cpath d='M5 11v6l11 6v-6Z' fill='%23C58B47'/%3E%3Cpath d='M27 11v6l-11 6v-6Z' fill='%239C6A32'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">
+        <svg viewBox="0 0 32 32" width="26" height="26">
+          <path d="M16 3 29 10 16 17 3 10Z" fill="#E9B872"/>
+          <path d="M3 10v6l13 7v-6Z" fill="#C58B47"/>
+          <path d="M29 10v6l-13 7v-6Z" fill="#9C6A32"/>
+          <path d="M16 19 29 12v3l-13 7Z" fill="#F0C98D" opacity=".55"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <h1>Palletizer</h1>
+        <p>托盘码放测算台 · 桌面版</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <a class="btn ghost" href="../?mobile=1" title="切换到手机版布局">手机版</a>
+      <span class="save-hint" id="saveHint"></span>
+      <button class="btn ghost" id="btnTemplate" title="下载可导入的 Excel 模板">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 1v8m0 0 3-3M8 9 5 6M2 11v3h12v-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        模板
+      </button>
+      <label class="btn primary file-btn" id="importLabel">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 11V3m0 0L5 6m3-3 3 3M2 11v3h12v-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        导入 Excel
+        <input type="file" id="fileInput" accept=".xlsx,.xlsm,.csv">
+      </label>
+      <div class="menu-wrap">
+        <button class="btn ghost" id="btnExport">
+          导出
+          <svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true"><path d="m2 4 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+        <div class="menu" id="exportMenu" hidden>
+          <button data-export="xlsx">导出测算结果 Excel</button>
+          <button data-export="print">打印 / 存为 PDF</button>
+          <button data-export="png">保存 3D 截图</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- 左：参数 -->
+    <aside class="panel params">
+      <section class="card">
+        <div class="card-head">
+          <h2>托盘 / 容器</h2>
+          <span class="tag">内净尺寸 · mm</span>
+        </div>
+        <div class="field-row three">
+          <label class="field"><span>长</span><input id="palletL" type="number" min="0" step="0.1" value="120"></label>
+          <label class="field"><span>宽</span><input id="palletW" type="number" min="0" step="0.1" value="80"></label>
+          <label class="field"><span>最大总高</span><input id="palletH" type="number" min="0" step="0.1" value="115"></label>
+        </div>
+        <div class="field-row two">
+          <label class="field"><span>托盘高度</span><input id="palletBase" type="number" min="0" step="0.1" value="0"></label>
+          <label class="field"><span>可用码放高</span><input id="palletUsable" type="text" readonly value="115"></label>
+        </div>
+        <p class="hint">最大总高包含托盘；可用码放高 = 最大总高 − 托盘高度。托盘高度填 0 时按旧口径处理。</p>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>纸箱</h2>
+          <span class="tag">外径 · mm</span>
+        </div>
+        <label class="field block"><span>名称 / 型号</span><input id="cartonName" type="text" value="示例纸箱" maxlength="40"></label>
+        <div class="field-row three">
+          <label class="field"><span>长</span><input id="cartonL" type="number" min="0" step="0.1" value="28"></label>
+          <label class="field"><span>宽</span><input id="cartonW" type="number" min="0" step="0.1" value="18"></label>
+          <label class="field"><span>高</span><input id="cartonH" type="number" min="0" step="0.1" value="10"></label>
+        </div>
+        <div class="field-row two">
+          <label class="field"><span>订单数量</span><input id="cartonQty" type="number" min="0" step="1" value="500"></label>
+          <label class="field"><span>单箱重量 kg</span><input id="cartonWeight" type="number" min="0" step="0.01" value="0.15"></label>
+        </div>
+        <div class="lock-note">
+          <svg viewBox="0 0 14 14" width="12" height="12" aria-hidden="true"><rect x="2.5" y="6" width="9" height="6" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M4.5 6V4.4a2.5 2.5 0 0 1 5 0V6" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>
+          默认只按原包装方向平放；侧立 / 竖放打开后才参与计算
+        </div>
+        <div class="orient-box">
+          <div class="orient-head">允许摆放方式 <em>平放始终允许</em></div>
+          <div class="orient-opts">
+            <label class="check"><input id="allowSide" type="checkbox"><span>侧立</span><em>宽作高</em></label>
+            <label class="check"><input id="allowUprightLay" type="checkbox"><span>竖放</span><em>长作高</em></label>
+          </div>
+        </div>
+      </section>
+
+      <section class="card advanced">
+        <button class="collapse" id="advToggle" type="button" aria-expanded="true">
+          <span>码放规则</span>
+          <em>间隙 / 余量 / 垫板 / 载重</em>
+          <svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="m2 4 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+        <div class="adv-body" id="advBody">
+          <div class="field-row two">
+            <label class="field"><span>箱间间隙</span><input id="optGap" type="number" min="0" step="0.1" value="0"></label>
+            <label class="field"><span>边缘余量</span><input id="optMargin" type="number" min="0" step="0.1" value="0"></label>
+            <label class="field"><span>层间垫板厚</span><input id="optSheet" type="number" min="0" step="0.1" value="0"></label>
+            <label class="field"><span>允许超出托盘</span><input id="optOverhang" type="number" min="0" step="0.1" value="0"></label>
+            <label class="field"><span>最大载重 kg</span><input id="optMaxLoad" type="number" min="0" step="1" value="0"></label>
+            <label class="field"><span>最多堆叠层数</span><input id="optMaxLayers" type="number" min="0" step="1" value="0"></label>
+          </div>
+          <label class="check wide"><input id="allowSmallBottom" type="checkbox" checked><span>允许小 / 轻层垫底补空</span><em>仅当能减少托数</em></label>
+          <label class="check wide"><input id="globalOptimize" type="checkbox"><span>全局省托（整层跨规格补位）</span><em>会打散整托</em></label>
+          <p class="hint">全局省托会先按规格整托，再把整层塞进其他托的剩余高度；托盘数最少，但整托可能不再单一规格。</p>
+          <p class="hint">默认大 / 重在下、小 / 轻在上；打开后允许多个尾层同托，只有确实减少托数时才采用。</p>
+          <p class="hint">0 表示不限制。允许超出会向四周同时扩展。</p>
+        </div>
+      </section>
+
+      <div class="panel-foot">
+        <button class="link" id="btnReset" type="button">恢复示例</button>
+        <span>纯本地计算 · 数据不上传</span>
+      </div>
+    </aside>
+
+    <!-- 中：KPI + 3D -->
+    <section class="stage">
+      <div class="kpis">
+        <div class="kpi">
+          <span id="kpiPerLayerLabel">每层</span>
+          <strong id="kpiPerLayer">—</strong>
+          <em id="kpiPattern">—</em>
+        </div>
+        <div class="kpi">
+          <span id="kpiLayersLabel">层数</span>
+          <strong id="kpiLayers">—</strong>
+          <em id="kpiPitch">—</em>
+        </div>
+        <div class="kpi primary">
+          <span id="kpiTotalLabel">单托数量</span>
+          <strong id="kpiTotal">—</strong>
+          <em id="kpiDelta"></em>
+        </div>
+        <div class="kpi">
+          <span id="kpiVolLabel">体积利用率</span>
+          <strong id="kpiVol">—</strong>
+          <div class="bar"><i id="kpiVolBar"></i></div>
+        </div>
+        <div class="kpi">
+          <span id="kpiPalletLabel">订单需托数</span>
+          <strong id="kpiPallets">—</strong>
+          <em id="kpiQty">未填数量</em>
+        </div>
+      </div>
+
+      <div class="viewport-wrap" id="viewportWrap">
+        <canvas id="scene"></canvas>
+
+        <div class="vp-top">
+          <div class="vp-left">
+            <div class="scenario-badge" id="scenarioBadge">基准方案</div>
+            <div class="actual-chip empty" id="actualChip">实际码放 —</div>
+            <button class="exit-pallet" id="btnExitPallet" type="button" hidden>← 返回纸箱视图</button>
+          </div>
+          <div class="view-tools">
+            <div class="seg" id="viewSeg">
+              <button data-view="iso" class="active">等轴测</button>
+              <button data-view="top">俯视</button>
+              <button data-view="front">正视</button>
+              <button data-view="side">侧视</button>
+            </div>
+            <button class="icon-btn" id="btnRotate" title="自动旋转" aria-label="自动旋转">
+              <svg viewBox="0 0 18 18" width="16" height="16" aria-hidden="true"><path d="M14.5 6.5A6 6 0 1 0 15 9" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M15 3.5v3.2h-3.2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <button class="icon-btn" id="btnResetCam" title="重置视角" aria-label="重置视角">
+              <svg viewBox="0 0 18 18" width="16" height="16" aria-hidden="true"><path d="M3 9a6 6 0 1 1 1.8 4.3M3 5v4h4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="vp-bottom">
+          <div class="layer-ctl">
+            <div class="ctl-row">
+              <label for="visibleRange">显示层数 <b id="visibleLabel">全部</b></label>
+              <input type="range" id="visibleRange" min="1" max="1" value="1">
+            </div>
+            <div class="ctl-row">
+              <label for="explodeRange">拆层间距 <b id="explodeVal">10%</b></label>
+              <input type="range" id="explodeRange" min="0" max="100" value="10">
+              <button class="chip" id="onlyLayer" type="button" title="只显示当前选中的一层">只看选中层</button>
+            </div>
+          </div>
+          <div class="vp-meta">
+            <span id="layerInfo">全部层</span>
+            <span class="legend"><i class="sw a"></i>顺排 <i class="sw b"></i>旋转 90°</span>
+          </div>
+        </div>
+
+        <div class="vp-hint" id="vpHint">拖动旋转 · 滚轮缩放 · 双击复位</div>
+      </div>
+    </section>
+
+    <!-- 右：放量 / 逐层 / 清单 -->
+    <aside class="panel insights">
+      <div class="tabs" id="tabs">
+        <button data-tab="advice" class="active">放量推荐</button>
+        <button data-tab="pallets">托盘清单</button>
+        <button data-tab="layers">逐层明细</button>
+        <button data-tab="skus">纸箱清单 <i id="skuCount" hidden>0</i></button>
+      </div>
+
+      <div class="tab-pane" id="tab-advice">
+        <div class="limits-block">
+          <div class="block-head">
+            <span>可放量范围</span>
+            <em id="limitHint">最多可增加多少 mm</em>
+          </div>
+          <div class="limits-row">
+            <label>长 +<input id="limL" type="number" min="0" max="500" step="1" value="20"></label>
+            <label>宽 +<input id="limW" type="number" min="0" max="500" step="1" value="0"></label>
+            <label>高 +<input id="limH" type="number" min="0" max="500" step="1" value="6"></label>
+          </div>
+        </div>
+
+        <div class="delta-block">
+          <div class="block-head">
+            <span>试算放量</span>
+            <em id="previewDimText">—</em>
+          </div>
+          <div class="delta-row">
+            <label>长 <b id="dLval">+0</b></label>
+            <input id="dL" type="range" min="0" max="20" step="1" value="0">
+            <span class="delta-total" id="dLmax">/20</span>
+          </div>
+          <div class="delta-row">
+            <label>宽 <b id="dWval">+0</b></label>
+            <input id="dW" type="range" min="0" max="0" step="1" value="0" disabled>
+            <span class="delta-total" id="dWmax">/0</span>
+          </div>
+          <div class="delta-row">
+            <label>高 <b id="dHval">+0</b></label>
+            <input id="dH" type="range" min="0" max="6" step="1" value="0">
+            <span class="delta-total" id="dHmax">/6</span>
+          </div>
+          <div class="preview-bar" id="previewBar">
+            <div>
+              <strong id="previewCount">—</strong>
+              <span id="previewSub">未放量</span>
+            </div>
+            <button class="btn tiny" id="btnApplyPreview" disabled>应用为新基准</button>
+          </div>
+        </div>
+
+        <div class="block-head advice-head">
+          <span>推荐方案</span>
+          <em>改动越小越靠前</em>
+        </div>
+        <div class="advice-list" id="adviceList"></div>
+
+        <details class="axis-details" id="axisDetails">
+          <summary>单维收益（只看一个方向）</summary>
+          <div id="axisTable"></div>
+        </details>
+
+        <div class="note-card">
+          <b>计算口径</b>
+          <p>按层码放，纸箱只做水平 90° 旋转，不翻倒。推荐方案按“总放量毫米数”从小到大排序；3D 中拖动“拆层间距”可分开每层查看，标注尺寸为实际尺寸。</p>
+        </div>
+      </div>
+
+      <div class="tab-pane" id="tab-layers" hidden>
+        <div class="layers-summary" id="layersSummary">—</div>
+        <div class="layer-list" id="layerList"></div>
+      </div>
+
+      <div class="tab-pane" id="tab-pallets" hidden>
+        <div class="plan-toolbar">
+          <div class="plan-toolbar-text">
+            <b>最终托盘数</b>
+            <span>整托 + 尾箱混托，按当前订单汇总</span>
+          </div>
+          <label class="switch">
+            <input id="allowMix" type="checkbox" checked>
+            <i></i>
+            允许混托
+          </label>
+        </div>
+        <div class="plan-summary" id="planSummary">—</div>
+        <div class="block-head plan-subhead">
+          <span>纸箱汇总</span>
+          <em>整托 / 尾箱</em>
+        </div>
+        <div class="plan-sku-list" id="planSkuList"></div>
+        <div class="block-head plan-subhead">
+          <span>托盘明细</span>
+          <em>点一行查看 3D</em>
+        </div>
+        <div class="pallet-list" id="palletList"></div>
+      </div>
+
+      <div class="tab-pane" id="tab-skus" hidden>
+        <p class="hint sku-hint">导入的每行纸箱会单独测算；点一行即可切换 3D 与推荐。</p>
+        <div id="skuList"></div>
+      </div>
+    </aside>
+  </main>
+
+  <div class="toast" id="toast" role="status"></div>
+</div>
+
+<script src="js/core.js"></script>
+<script src="js/xlsx-lite.js"></script>
+<script src="js/render3d.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

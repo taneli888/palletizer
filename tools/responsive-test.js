@@ -119,34 +119,36 @@ async function shot(cdp, name) {
     await shot(cdp, 'resp-ipad-plan.png');
 
     await metrics(cdp, 1440, 900);
-    await sleep(600);
-    await ev(cdp, "document.querySelector('.tab[data-tab=input]').click()");
-    await sleep(250);
+    await cdp.send('Page.navigate', { url: PAGE });
+    await sleep(1800);
     const desktop = await ev(cdp, `({
-      inputDisplay: getComputedStyle(document.querySelector('#view-input')).display,
-      viewWidth: Math.round(document.querySelector('#view-input').getBoundingClientRect().width),
-      overflow: document.documentElement.scrollWidth <= innerWidth + 1,
-      tabWidth: Math.round(document.querySelector('.tabbar').getBoundingClientRect().width)
+      path: location.pathname,
+      title: document.title,
+      hasLayout: !!document.querySelector('main.layout'),
+      cols: document.querySelector('main.layout') ? getComputedStyle(document.querySelector('main.layout')).gridTemplateColumns : '',
+      palletBase: !!document.querySelector('#palletBase'),
+      globalOptimize: !!document.querySelector('#globalOptimize'),
+      smallBottom: !!document.querySelector('#allowSmallBottom'),
+      overflow: document.documentElement.scrollWidth <= innerWidth + 1
     })`);
     console.log('desktop:', desktop);
-    if (desktop.inputDisplay !== 'grid') throw new Error('桌面录入页应为两列');
-    if (desktop.viewWidth < 900) throw new Error('桌面内容宽度不足');
+    if (!/\/desktop\/$/.test(desktop.path)) throw new Error('桌面应跳到 /desktop/，实际 ' + desktop.path);
+    if (!desktop.hasLayout) throw new Error('桌面原三栏布局未加载');
+    if (desktop.cols.split(' ').length < 3) throw new Error('桌面不是三栏：' + desktop.cols);
+    if (!desktop.palletBase || !desktop.globalOptimize || !desktop.smallBottom) throw new Error('桌面版缺少最新功能控件');
     if (!desktop.overflow) throw new Error('桌面横向溢出');
+    await shot(cdp, 'resp-desktop-original.png');
 
-    await ev(cdp, "document.querySelector('.tab[data-tab=plan]').click()");
-    await sleep(400);
-    await ev(cdp, "document.querySelectorAll('.pallet-card')[11].click()");
-    await sleep(800);
-    const detail = await ev(cdp, `({
-      display: getComputedStyle(document.querySelector('.detail-scroll')).display,
-      cols: getComputedStyle(document.querySelector('.detail-scroll')).gridTemplateColumns,
-      sceneW: Math.round(document.querySelector('.scene-wrap').getBoundingClientRect().width),
-      sceneH: Math.round(document.querySelector('.scene-wrap').getBoundingClientRect().height)
+    // 强制手机版参数仍可用
+    await cdp.send('Page.navigate', { url: PAGE + '?mobile=1' });
+    await sleep(1400);
+    const forced = await ev(cdp, `({
+      path: location.pathname,
+      display: getComputedStyle(document.querySelector('#view-input')).display
     })`);
-    console.log('desktop detail:', detail);
-    if (detail.display !== 'grid') throw new Error('桌面 3D 详情应为左右分栏');
-    if (detail.sceneW < 500) throw new Error('桌面 3D 画布过窄');
-    await shot(cdp, 'resp-desktop-detail.png');
+    console.log('forced mobile:', forced);
+    if (/\/desktop\/$/.test(forced.path)) throw new Error('?mobile=1 不应跳到桌面版');
+    if (forced.display !== 'grid') throw new Error('?mobile=1 桌面宽度下仍应两列');
 
     console.log('RESPONSIVE CHECKS PASSED');
     cdp.ws.close();

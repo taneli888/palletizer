@@ -3,7 +3,7 @@
 **托盘码放测算台**  
 A responsive pallet loading calculator for iPhone, iPad and desktop.
 
-**v1.6：iPhone / iPad / 电脑桌面自适应；桌面端不再显示“手机版”；字体档位、双指方向、逐层高亮、拆层间距、顶部平整。**
+**v1.7：电脑桌面自动进入原三栏版布局；iPhone / iPad 保持手机版布局；桌面地址 /desktop/。**
 
 > 目标部署地址：<https://taneli888.github.io/palletizer/>  
 > GitHub 仓库：<https://github.com/taneli888/palletizer>  
@@ -16,14 +16,14 @@ A responsive pallet loading calculator for iPhone, iPad and desktop.
 ![Palletizer 3D 详情](docs/mobile-detail.png)
 ![Palletizer 字体设置](docs/mobile-settings.png)
 ![iPad 两列录入](docs/resp-ipad-input.png)
-![桌面 3D 分栏](docs/resp-desktop-detail.png)
+![桌面原三栏布局](docs/resp-desktop-original.png)
 
 ## 这是什么
 
 Palletizer 是一个纯前端 PWA，针对 iPhone 屏幕重新做了界面：
 
 - 单列大卡片、底部 Tab、底部弹层，适合单手操作；
-- **自动适配**：iPhone 单列；iPad 两列录入/方案；电脑桌面更宽的侧栏 + 两列明细，3D 详情左右分栏；
+- **自动适配**：iPhone / iPad 用现在的单列 / 两列手机版；电脑桌面自动进入原版三栏工作台（左录入、中 3D、右方案）；
 - 手工添加 / 编辑纸箱；
 - 导入 `.xlsx` / `.csv`（托盘参数 + 纸箱明细）；
 - 自动计算整托 / 尾托 / 混托 / 全局省托；
@@ -72,6 +72,14 @@ iPhone 通过局域网 IP 访问时，Service Worker 需要 HTTPS，建议直接
 
 `sw.js` 里的缓存路径是相对的，放在仓库根目录或子目录都能工作。更新后如果仍是旧页面，Safari 里删掉主屏幕图标重新添加，或强制刷新。
 
+电脑浏览器访问根地址时，会自动跳到：
+
+```
+https://taneli888.github.io/palletizer/desktop/
+```
+
+显示原来的三栏桌面布局；“手机版”按钮或 `?mobile=1` 可强制回到手机布局。
+
 ## 兼容性
 
 - iPhone Safari **iOS 16.4+**：Excel `.xlsx` 解压（`DecompressionStream('deflate-raw')`）可用；
@@ -95,7 +103,8 @@ Palletizer/
 ├─ sw.js
 ├─ css/mobile.css
 ├─ css/readability.css   # 字体档位 / 拆层间距
-├─ css/responsive.css    # iPhone / iPad / 桌面自适应
+├─ css/responsive.css    # iPhone / iPad 自适应
+├─ desktop/              # 电脑桌面原三栏版（功能与手机版同步）
 ├─ js/core.js          # 桌面版同一套计算内核
 ├─ js/xlsx-lite.js
 ├─ js/render3d.js
@@ -125,7 +134,7 @@ node tools/responsive-test.js
 
 - iPhone 390：保持单列；
 - iPad 820：录入/方案变两列，底部导航收窄；
-- Desktop 1440：内容 1240 宽，3D 详情左右分栏，无横向溢出。
+- Desktop 1440：自动进入 `/desktop/` 原三栏工作台，三栏布局和最新控件齐全；`?mobile=1` 可强制手机布局。
 
 ## 关于“原生 App”
 

@@ -1,5 +1,5 @@
 /* Palletizer 离线缓存 */
-const CACHE = 'palletizer-v1.6.0';
+const CACHE = 'palletizer-v1.7.0';
 const ASSETS = [
   './',
   './index.html',
@@ -14,7 +14,14 @@ const ASSETS = [
   './icons/icon-180.png',
   './icons/icon-192.png',
   './icons/icon-512.png',
-  './icons/icon-1024.png'
+  './icons/icon-1024.png',
+  './desktop/',
+  './desktop/index.html',
+  './desktop/css/style.css',
+  './desktop/js/core.js',
+  './desktop/js/xlsx-lite.js',
+  './desktop/js/render3d.js',
+  './desktop/js/app.js'
 ];
 
 self.addEventListener('install', (event) => {

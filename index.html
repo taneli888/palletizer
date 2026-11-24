@@ -15,6 +15,21 @@
   <link rel="stylesheet" href="css/readability.css">
   <link rel="stylesheet" href="css/responsive.css">
   <title>Palletizer · 托盘码放测算台</title>
+  <script>
+    (function () {
+      try {
+        var ua = navigator.userAgent || '';
+        var ipadLike = /iPad|iPhone|iPod/i.test(ua) ||
+          (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+        var androidPhone = /Android/i.test(ua) && /Mobile/i.test(ua);
+        var forceMobile = /[?&]mobile=1/.test(location.search);
+        var wide = window.matchMedia && window.matchMedia('(min-width: 1100px)').matches;
+        if (wide && !ipadLike && !androidPhone && !forceMobile) {
+          location.replace('desktop/' + location.hash);
+        }
+      } catch (e) { /* keep mobile layout */ }
+    })();
+  </script>
 </head>
 <body>
 <div id="app">
@@ -121,7 +136,7 @@
     <section class="card settings-hero">
       <div class="brand-mark large">P</div>
       <div><h2>Palletizer</h2><p>托盘码放测算台</p></div>
-      <span class="version">v1.6</span>
+      <span class="version">v1.7</span>
     </section>
     <section class="card">
       <h2 class="card-title">数据</h2>
