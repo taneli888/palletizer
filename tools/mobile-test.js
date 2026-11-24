@@ -179,7 +179,7 @@ async function shot(cdp, name) {
       return { z0, z1 };
     })()`);
     console.log('pinch zoom:', pinch);
-    if (!(pinch.z1 > pinch.z0 + 0.05)) throw new Error('双指缩放未改变 3D 缩放：' + JSON.stringify(pinch));
+    if (!(pinch.z1 < pinch.z0 - 0.05)) throw new Error('双指放大应让 3D 图像变大（zoom 变小）：' + JSON.stringify(pinch));
 
     const exp0 = await evaluate(cdp, "({ value: document.querySelector('#explodeRange').value, mm: window.__palletizerScene.explode })");
     await evaluate(cdp, `(() => {
@@ -192,6 +192,17 @@ async function shot(cdp, name) {
     console.log('explode:', exp0, exp1);
     if (exp1.value !== '50' || exp1.label !== '50%') throw new Error('拆层间距滑块未更新');
     if (!(exp1.mm > exp0.mm + 1)) throw new Error('拆层间距没有作用于 3D');
+    await evaluate(cdp, "window.__palletizerScene.resetCamera()");
+    await sleep(300);
+    const layerSelect = await evaluate(cdp, `(() => {
+      document.querySelectorAll('.layer-row')[1].click();
+      return {
+        selected: window.__palletizerScene.selectedLayer,
+        active: document.querySelectorAll('.layer-row')[1].classList.contains('active')
+      };
+    })()`);
+    console.log('layer select:', layerSelect);
+    if (layerSelect.selected !== 1 || !layerSelect.active) throw new Error('逐层点击未高亮：' + JSON.stringify(layerSelect));
     await shot(cdp, 'mobile-03-detail.png');
     await evaluate(cdp, "document.querySelector('#detailBack').click()");
     await sleep(300);
@@ -236,6 +247,16 @@ async function shot(cdp, name) {
     console.log('pwa:', pwa);
     if (!pwa.manifest) throw new Error('缺少 manifest');
     if (!pwa.sw) throw new Error('Service Worker 未注册');
+    await evaluate(cdp, "document.querySelector('#fontSeg [data-font=xxlarge]').click()");
+    await sleep(400);
+    const font = await evaluate(cdp, `({
+      attr: document.documentElement.dataset.font,
+      size: getComputedStyle(document.body).fontSize,
+      active: document.querySelector('#fontSeg button.active').dataset.font
+    })`);
+    console.log('font size:', font);
+    if (font.attr !== 'xxlarge' || font.active !== 'xxlarge') throw new Error('字体档位未生效');
+    if (parseFloat(font.size) < 22) throw new Error('超大字体没有变大：' + font.size);
     await shot(cdp, 'mobile-04-settings.png');
 
     if (errors.length) throw new Error('浏览器错误：' + errors.join(' | '));

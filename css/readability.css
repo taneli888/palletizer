@@ -1,59 +1,68 @@
-/* Palletizer v1.2：手机可读性 + 3D 拆层间距 */
+/* Palletizer：手机可读性、字体档位、3D 拆层间距 */
+:root { --fs: 1; }
+html[data-font="large"] { --fs: 1.12; }
+html[data-font="xlarge"] { --fs: 1.24; }
+html[data-font="xxlarge"] { --fs: 1.36; }
+
 html { -webkit-text-size-adjust: 100%; }
-body { font-size: 17px; line-height: 1.5; }
-.brand-text h1 { font-size: 21px; }
-.brand-text p { font-size: 12px; }
-.brand-mark { width: 40px; height: 40px; font-size: 21px; }
-.card h2, .card-title { font-size: 17px; }
-.chip { font-size: 12px; padding: 5px 10px; }
-.text-btn { font-size: 15px; }
-.field span { font-size: 13px; }
-.field input { height: 50px; font-size: 18px; }
-.usable-line span { font-size: 13px; }
-.usable-line strong { font-size: 23px; }
-.micro { font-size: 13px; }
-.carton-main strong { font-size: 15px; }
-.carton-main small { font-size: 13px; }
-.carton-qty b { font-size: 19px; }
-.carton-qty span { font-size: 10px; }
-.switch-row { min-height: 60px; }
-.switch-row b { font-size: 15px; }
-.switch-row small { font-size: 13px; }
-.primary-btn { min-height: 56px; font-size: 17px; }
-.secondary-btn { font-size: 15px; }
-.input-hint { font-size: 12px; }
-.hero-kicker { font-size: 12px; }
-.hero-total strong { font-size: 64px; }
-.hero-sub { font-size: 13px; }
-.hero-grid b { font-size: 18px; }
-.hero-grid span { font-size: 11.5px; }
-.plan-note { font-size: 13px; }
-.section-line h2 { font-size: 17px; }
-.section-line span { font-size: 12px; }
-.pallet-main strong { font-size: 15px; }
-.pallet-main small { font-size: 13px; line-height: 1.45; }
-.pallet-num b { font-size: 20px; }
-.pallet-num span { font-size: 10px; }
-.badge { font-size: 10px; padding: 3px 7px; }
-.empty-state h2 { font-size: 19px; }
-.empty-state p { font-size: 13px; }
-.settings-text { font-size: 13px; }
-.settings-text.muted { font-size: 11.5px; }
-.list-btn span { font-size: 15px; }
-.list-btn em { font-size: 11px; }
-.install-badge { font-size: 12px; }
-.tab { font-size: 13px; min-height: 56px; }
-.tab svg { width: 23px; height: 23px; }
-.detail-head h2 { font-size: 16px; }
-.detail-head p { font-size: 12px; }
-.seg button { font-size: 12px; padding: 8px 10px; }
-.scene-hint { font-size: 11px; }
-.detail-metrics span { font-size: 12px; }
-.detail-metrics b { font-size: 16px; }
-.layer-main strong { font-size: 13.5px; }
-.layer-main small { font-size: 12px; }
-.sheet-head h2 { font-size: 19px; }
-.toast { font-size: 13px; }
+body { font-size: calc(17px * var(--fs)); line-height: 1.5; }
+.view {
+  padding-top: calc(78px + var(--safe-top) + (var(--fs) - 1) * 22px);
+  padding-bottom: calc(92px + var(--safe-bottom) + (var(--fs) - 1) * 18px);
+}
+.brand-text h1 { font-size: calc(21px * var(--fs)); }
+.brand-text p { font-size: calc(12px * var(--fs)); }
+.brand-mark { width: calc(40px * var(--fs)); height: calc(40px * var(--fs)); font-size: calc(21px * var(--fs)); }
+.card h2, .card-title { font-size: calc(17px * var(--fs)); }
+.chip { font-size: calc(12px * var(--fs)); padding: 5px 10px; }
+.text-btn { font-size: calc(15px * var(--fs)); }
+.field span { font-size: calc(13px * var(--fs)); }
+.field input { height: calc(50px * var(--fs)); font-size: calc(18px * var(--fs)); }
+.usable-line span { font-size: calc(13px * var(--fs)); }
+.usable-line strong { font-size: calc(23px * var(--fs)); }
+.micro { font-size: calc(13px * var(--fs)); }
+.carton-main strong { font-size: calc(15px * var(--fs)); }
+.carton-main small { font-size: calc(13px * var(--fs)); }
+.carton-qty b { font-size: calc(19px * var(--fs)); }
+.carton-qty span { font-size: calc(10px * var(--fs)); }
+.switch-row { min-height: calc(60px * var(--fs)); }
+.switch-row b { font-size: calc(15px * var(--fs)); }
+.switch-row small { font-size: calc(13px * var(--fs)); }
+.primary-btn { min-height: calc(56px * var(--fs)); font-size: calc(17px * var(--fs)); }
+.secondary-btn { font-size: calc(15px * var(--fs)); }
+.input-hint { font-size: calc(12px * var(--fs)); }
+.hero-kicker { font-size: calc(12px * var(--fs)); }
+.hero-total strong { font-size: calc(64px * var(--fs)); }
+.hero-sub { font-size: calc(13px * var(--fs)); }
+.hero-grid b { font-size: calc(18px * var(--fs)); }
+.hero-grid span { font-size: calc(11.5px * var(--fs)); }
+.plan-note { font-size: calc(13px * var(--fs)); }
+.section-line h2 { font-size: calc(17px * var(--fs)); }
+.section-line span { font-size: calc(12px * var(--fs)); }
+.pallet-main strong { font-size: calc(15px * var(--fs)); }
+.pallet-main small { font-size: calc(13px * var(--fs)); line-height: 1.45; }
+.pallet-num b { font-size: calc(20px * var(--fs)); }
+.pallet-num span { font-size: calc(10px * var(--fs)); }
+.badge { font-size: calc(10px * var(--fs)); padding: 3px 7px; }
+.empty-state h2 { font-size: calc(19px * var(--fs)); }
+.empty-state p { font-size: calc(13px * var(--fs)); }
+.settings-text { font-size: calc(13px * var(--fs)); }
+.settings-text.muted { font-size: calc(11.5px * var(--fs)); }
+.list-btn span { font-size: calc(15px * var(--fs)); }
+.list-btn em { font-size: calc(11px * var(--fs)); }
+.install-badge { font-size: calc(12px * var(--fs)); }
+.tab { font-size: calc(13px * var(--fs)); min-height: calc(56px * var(--fs)); }
+.tab svg { width: calc(23px * var(--fs)); height: calc(23px * var(--fs)); }
+.detail-head h2 { font-size: calc(16px * var(--fs)); }
+.detail-head p { font-size: calc(12px * var(--fs)); }
+.seg button { font-size: calc(12px * var(--fs)); padding: 8px 10px; }
+.scene-hint { font-size: calc(11px * var(--fs)); }
+.detail-metrics span { font-size: calc(12px * var(--fs)); }
+.detail-metrics b { font-size: calc(16px * var(--fs)); }
+.layer-main strong { font-size: calc(13.5px * var(--fs)); }
+.layer-main small { font-size: calc(12px * var(--fs)); }
+.sheet-head h2 { font-size: calc(19px * var(--fs)); }
+.toast { font-size: calc(13px * var(--fs)); }
 
 /* 3D 拆层间距 */
 .explode-row {
@@ -61,6 +70,13 @@ body { font-size: 17px; line-height: 1.5; }
   margin-top: 9px; padding: 10px 12px;
   background: var(--card); border: 1px solid var(--line); border-radius: 14px;
 }
-.explode-row span { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+.explode-row span { font-size: calc(12.5px * var(--fs)); color: var(--muted); white-space: nowrap; }
 .explode-row input[type="range"] { flex: 1; accent-color: var(--accent); height: 28px; }
-.explode-row b { font-size: 12px; color: var(--accent-dark); min-width: 34px; text-align: right; }
+.explode-row b { font-size: calc(12px * var(--fs)); color: var(--accent-dark); min-width: 34px; text-align: right; }
+
+/* 字体大小设置 */
+.font-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.font-row > span { font-size: calc(13px * var(--fs)); color: var(--muted); white-space: nowrap; }
+.font-seg { display: flex; gap: 3px; background: #f1ede5; border-radius: 12px; padding: 3px; }
+.font-seg button { border: 0; background: transparent; color: #8c8579; font-size: calc(12px * var(--fs)); border-radius: 9px; padding: 8px 9px; min-height: 36px; }
+.font-seg button.active { background: var(--card); color: var(--accent-dark); font-weight: 700; box-shadow: 0 1px 4px rgba(0,0,0,.08); }

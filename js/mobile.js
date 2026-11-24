@@ -4,7 +4,7 @@
   var Core = window.PalletCore;
   var XL = window.XlsxLite;
   var KEY = 'palletizer.v1';
-  var VERSION = '1.3.0';
+  var VERSION = '1.4.0';
   var PALETTE = ['#C99A5F', '#9FB3A6', '#C7A6A0', '#B1A3C9', '#D1B280', '#8FA9B8'];
 
   var DEFAULTS = {
@@ -18,7 +18,8 @@
       gap: 0, margin: 0, sheet: 0, overhang: 0, maxLoad: 1000, maxLayers: 0,
       allowSide: false, allowUprightLay: false,
       allowMix: true, allowSmallBottom: true, globalOptimize: false
-    }
+    },
+    fontSize: 'normal'
   };
 
   var state = loadState();
@@ -80,6 +81,9 @@
         });
         if (!s.cartons.length) s.cartons = clone(DEFAULTS.cartons);
       }
+      if (['normal', 'large', 'xlarge', 'xxlarge'].indexOf(saved.fontSize) >= 0) {
+        s.fontSize = saved.fontSize;
+      }
     } catch (e) { /* ignore broken storage */ }
     return s;
   }
@@ -94,6 +98,16 @@
     el.classList.add('show');
     clearTimeout(toast._t);
     toast._t = setTimeout(function () { el.classList.remove('show'); }, 2400);
+  }
+
+  function applyFontSize() {
+    var size = ['normal', 'large', 'xlarge', 'xxlarge'].indexOf(state.fontSize) >= 0 ? state.fontSize : 'normal';
+    state.fontSize = size;
+    document.documentElement.dataset.font = size;
+    $all('#fontSeg button').forEach(function (b) {
+      b.classList.toggle('active', b.dataset.font === size);
+    });
+    if (scene) setTimeout(function () { scene.resize(); }, 80);
   }
 
   function usableH() { return Math.max(0, state.pallet.H - state.pallet.base); }
@@ -453,7 +467,7 @@
       var color = '#C99A5F';
       if (p.type === 'mixed' && u.skuIndex >= 0) color = PALETTE[u.skuIndex % PALETTE.length];
       if (u.parts && u.parts.length) color = PALETTE[u.parts[0].skuIndex % PALETTE.length];
-      return '<div class="layer-row">' +
+      return '<div class="layer-row" data-layer="' + i + '" role="button" tabindex="0">' +
         '<span class="layer-index">' + (i + 1) + '</span>' +
         '<span class="layer-main"><strong>' + esc(unitLabel(u)) + '</strong>' +
         '<small>' + fmt(u.thickness) + ' mm · ' + u.count + ' 箱 · ' + esc(u.pattern) + '</small></span>' +
@@ -468,9 +482,20 @@
     requestAnimationFrame(function () {
       var s = ensureScene();
       s.resize();
+      s.selectedLayer = -1;
+      s.onlySelected = false;
       s.setModel(buildModel(p));
       s.setView('iso');
       applyExplode();
+    });
+  }
+
+  function selectLayer(index) {
+    if (!scene) return;
+    var next = scene.selectedLayer === index ? -1 : index;
+    scene.setLayerView({ selectedLayer: next, onlySelected: false });
+    $all('#layerList .layer-row').forEach(function (row) {
+      row.classList.toggle('active', Number(row.dataset.layer) === next);
     });
   }
 
@@ -780,6 +805,17 @@
     });
     $('#detailBack').addEventListener('click', closeDetail);
     $('#explodeRange').addEventListener('input', applyExplode);
+    $('#layerList').addEventListener('click', function (e) {
+      var row = e.target.closest('[data-layer]');
+      if (row) selectLayer(Number(row.dataset.layer));
+    });
+    $('#layerList').addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      var row = e.target.closest('[data-layer]');
+      if (!row) return;
+      e.preventDefault();
+      selectLayer(Number(row.dataset.layer));
+    });
     $all('#viewSeg button').forEach(function (b) {
       b.addEventListener('click', function () {
         $all('#viewSeg button').forEach(function (x) { x.classList.toggle('active', x === b); });
@@ -817,13 +853,23 @@
       state = clone(DEFAULTS);
       saveState();
       syncPalletInputs(); syncAdvanced(); syncSwitches(); renderCartons();
+      applyFontSize();
       compute(false);
       switchTab('input');
       toast('已恢复示例数据');
     });
+    $('#fontSeg').addEventListener('click', function (e) {
+      var b = e.target.closest('[data-font]');
+      if (!b) return;
+      state.fontSize = b.dataset.font;
+      saveState();
+      applyFontSize();
+      toast('字体大小：' + b.textContent);
+    });
   }
 
   function init() {
+    applyFontSize();
     syncPalletInputs();
     syncAdvanced();
     syncSwitches();

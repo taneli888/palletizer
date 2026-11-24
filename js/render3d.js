@@ -598,7 +598,8 @@
         }
         var d = pinchDistance();
         if (d > 0 && pinch.dist > 0) {
-          self.cam.zoom = clamp(pinch.zoom * d / pinch.dist, 0.30, 5.0);
+          // cam.zoom 越大，相机离得越远、图像越小；双指张开应让 zoom 变小
+          self.cam.zoom = clamp(pinch.zoom * pinch.dist / d, 0.30, 5.0);
           self.requestRender();
         }
         return;

@@ -306,3 +306,9 @@ svg { width: 22px; height: 22px; display: block; }
   .detail.open { transform: translateX(-50%); }
   .tabbar { max-width: 520px; left: 50%; transform: translateX(-50%); border-radius: 18px 18px 0 0; }
 }
+
+/* 逐层高亮 */
+.layer-row { cursor: pointer; transition: border-color .15s, background .15s, transform .12s; }
+.layer-row:active { transform: scale(.995); }
+.layer-row.active { border-color: #c2733c; background: #fbf1e4; box-shadow: 0 0 0 2px rgba(194,115,60,.12); }
+.layer-row.active .layer-index { background: #c2733c; color: #fff8ee; }
