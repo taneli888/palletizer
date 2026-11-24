@@ -12,6 +12,7 @@
   <link rel="apple-touch-icon" href="icons/icon-180.png">
   <link rel="icon" type="image/png" href="icons/icon-192.png">
   <link rel="stylesheet" href="css/mobile.css">
+  <link rel="stylesheet" href="css/readability.css">
   <title>Palletizer · 托盘码放测算台手机版</title>
 </head>
 <body>
@@ -119,7 +120,7 @@
     <section class="card settings-hero">
       <div class="brand-mark large">P</div>
       <div><h2>Palletizer</h2><p>托盘码放测算台 · 手机版</p></div>
-      <span class="version">v1.0</span>
+      <span class="version">v1.2</span>
     </section>
     <section class="card">
       <h2 class="card-title">数据</h2>
@@ -169,6 +170,11 @@
   </header>
   <div class="detail-scroll">
     <div class="scene-wrap"><canvas id="scene"></canvas><div class="scene-hint">拖动旋转 · 双指缩放</div></div>
+    <div class="explode-row">
+      <span>拆层间距</span>
+      <input id="explodeRange" type="range" min="0" max="100" step="1" value="10" aria-label="拆层间距">
+      <b id="explodeValue">10%</b>
+    </div>
     <div class="detail-metrics" id="detailMetrics"></div>
     <div class="section-line"><h2>逐层明细</h2><span id="layerCountLabel">—</span></div>
     <div id="layerList" class="layer-list"></div>

@@ -560,14 +560,50 @@
     var self = this;
     var canvas = this.canvas;
     var down = null;
+    var pointers = new Map();
+    var pinch = null;
+
+    function pointerList() {
+      return Array.from(pointers.values());
+    }
+    function pinchDistance() {
+      var pts = pointerList();
+      if (pts.length < 2) return 0;
+      return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+    }
 
     canvas.addEventListener('pointerdown', function (e) {
       if (e.button !== 0) return;
-      down = { x: e.clientX, y: e.clientY, yaw: self.cam.yaw, pitch: self.cam.pitch, moved: false };
-      canvas.setPointerCapture(e.pointerId);
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+      if (pointers.size === 1) {
+        down = { x: e.clientX, y: e.clientY, yaw: self.cam.yaw, pitch: self.cam.pitch, moved: false };
+        pinch = null;
+      } else if (pointers.size === 2) {
+        var d = pinchDistance();
+        pinch = { dist: d > 0 ? d : 1, zoom: self.cam.zoom };
+        down = null;
+      }
       canvas.style.cursor = 'grabbing';
     });
+
     canvas.addEventListener('pointermove', function (e) {
+      if (!pointers.has(e.pointerId)) return;
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      if (pointers.size >= 2) {
+        if (!pinch) {
+          var d0 = pinchDistance();
+          pinch = { dist: d0 > 0 ? d0 : 1, zoom: self.cam.zoom };
+        }
+        var d = pinchDistance();
+        if (d > 0 && pinch.dist > 0) {
+          self.cam.zoom = clamp(pinch.zoom * d / pinch.dist, 0.30, 5.0);
+          self.requestRender();
+        }
+        return;
+      }
+
       if (!down) return;
       var dx = e.clientX - down.x;
       var dy = e.clientY - down.y;
@@ -576,12 +612,20 @@
       self.cam.pitch = clamp(down.pitch + dy * 0.006, 0.06, 1.50);
       self.requestRender();
     });
+
     function up(e) {
-      if (!down) return;
-      down = null;
-      canvas.style.cursor = 'grab';
+      pointers.delete(e.pointerId);
       if (canvas.hasPointerCapture && e.pointerId != null && canvas.hasPointerCapture(e.pointerId)) {
-        canvas.releasePointerCapture(e.pointerId);
+        try { canvas.releasePointerCapture(e.pointerId); } catch (err) {}
+      }
+      if (pointers.size === 1) {
+        var p = pointerList()[0];
+        down = { x: p.x, y: p.y, yaw: self.cam.yaw, pitch: self.cam.pitch, moved: false };
+        pinch = null;
+      } else if (pointers.size === 0) {
+        down = null;
+        pinch = null;
+        canvas.style.cursor = 'grab';
       }
     }
     canvas.addEventListener('pointerup', up);
@@ -589,7 +633,7 @@
     canvas.addEventListener('wheel', function (e) {
       e.preventDefault();
       var f = Math.exp(e.deltaY * 0.0011);
-      self.cam.zoom = clamp(self.cam.zoom * f, 0.48, 3.2);
+      self.cam.zoom = clamp(self.cam.zoom * f, 0.30, 5.0);
       self.requestRender();
     }, { passive: false });
     canvas.addEventListener('dblclick', function () { self.resetCamera(); });

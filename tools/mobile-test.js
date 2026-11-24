@@ -163,6 +163,35 @@ async function shot(cdp, name) {
     if (!detail.open) throw new Error('详情未打开');
     if (detail.layers !== 2) throw new Error('1072 最后混托应为 2 层');
     if (!(detail.canvasW > 100 && detail.canvasH > 100)) throw new Error('3D canvas 未初始化');
+    const pinch = await evaluate(cdp, `(() => {
+      const c = document.querySelector('#scene');
+      const s = window.__palletizerScene;
+      const z0 = s.cam.zoom;
+      const ev = (type, id, x, y) => c.dispatchEvent(new PointerEvent(type, {
+        pointerId: id, clientX: x, clientY: y, bubbles: true, button: 0, pointerType: 'touch'
+      }));
+      ev('pointerdown', 1, 100, 100);
+      ev('pointerdown', 2, 200, 200);
+      ev('pointermove', 2, 320, 320);
+      const z1 = s.cam.zoom;
+      ev('pointerup', 1, 100, 100);
+      ev('pointerup', 2, 320, 320);
+      return { z0, z1 };
+    })()`);
+    console.log('pinch zoom:', pinch);
+    if (!(pinch.z1 > pinch.z0 + 0.05)) throw new Error('双指缩放未改变 3D 缩放：' + JSON.stringify(pinch));
+
+    const exp0 = await evaluate(cdp, "({ value: document.querySelector('#explodeRange').value, mm: window.__palletizerScene.explode })");
+    await evaluate(cdp, `(() => {
+      const el = document.querySelector('#explodeRange');
+      el.value = 50;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    })()`);
+    await sleep(300);
+    const exp1 = await evaluate(cdp, "({ value: document.querySelector('#explodeRange').value, label: document.querySelector('#explodeValue').textContent, mm: window.__palletizerScene.explode })");
+    console.log('explode:', exp0, exp1);
+    if (exp1.value !== '50' || exp1.label !== '50%') throw new Error('拆层间距滑块未更新');
+    if (!(exp1.mm > exp0.mm + 1)) throw new Error('拆层间距没有作用于 3D');
     await shot(cdp, 'mobile-03-detail.png');
     await evaluate(cdp, "document.querySelector('#detailBack').click()");
     await sleep(300);

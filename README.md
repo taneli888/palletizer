@@ -3,6 +3,8 @@
 **托盘码放测算台 · 手机版**  
 A mobile-first pallet loading calculator for iPhone.
 
+**v1.2：整体字号调大；3D 支持双指缩放；拆层间距可调。**
+
 > 目标部署地址：<https://taneli888.github.io/palletizer/>  
 > GitHub 仓库：<https://github.com/taneli888/palletizer>  
 > 部署完成后，用 iPhone Safari 扫码打开，再“添加到主屏幕”。
@@ -21,7 +23,8 @@ Palletizer 是一个纯前端 PWA，针对 iPhone 屏幕重新做了界面：
 - 手工添加 / 编辑纸箱；
 - 导入 `.xlsx` / `.csv`（托盘参数 + 纸箱明细）；
 - 自动计算整托 / 尾托 / 混托 / 全局省托；
-- 每一托可以打开 3D 查看，显示实际尺寸和含托盘总高；
+- 每一托可以打开 3D 查看，显示实际尺寸和含托盘总高；拖动旋转，**双指捏合缩放**；
+- 3D 详情里有 **拆层间距** 滑块，层数多时可以拉开看清每一层；
 - 导出 / 分享 Excel；
 - 安装到 iPhone 主屏幕后可全屏、离线运行。
 

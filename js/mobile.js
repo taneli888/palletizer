@@ -4,7 +4,7 @@
   var Core = window.PalletCore;
   var XL = window.XlsxLite;
   var KEY = 'palletizer.v1';
-  var VERSION = '1.0.0';
+  var VERSION = '1.2.0';
   var PALETTE = ['#C99A5F', '#9FB3A6', '#C7A6A0', '#B1A3C9', '#D1B280', '#8FA9B8'];
 
   var DEFAULTS = {
@@ -28,6 +28,8 @@
   var scene = null;
   var editingIndex = -1;
   var detailId = '';
+  var currentDetail = null;
+  var explodePct = 10;
 
   function $(sel, root) { return (root || document).querySelector(sel); }
   function $all(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
@@ -386,6 +388,7 @@
     if (scene) return scene;
     scene = new window.Scene3D($('#scene'));
     scene.showDims = true;
+    window.__palletizerScene = scene;
     return scene;
   }
 
@@ -424,6 +427,7 @@
     var p = plan && plan.pallets.filter(function (x) { return x.id === id; })[0];
     if (!p) return;
     detailId = id;
+    currentDetail = p;
     $('#detailTitle').textContent = p.id + ' · ' + palletKind(p);
     $('#detailSub').textContent = p.boxes + ' 箱 · ' + p.layers + ' 层 · ' + fmt(p.weight) + ' kg';
     var totalH = p.height + state.pallet.base;
@@ -454,12 +458,28 @@
     $('#detail').classList.add('open');
     $('#detail').setAttribute('aria-hidden', 'false');
     document.body.style.overflow = 'hidden';
+    $('#explodeRange').value = explodePct;
+    $('#explodeValue').textContent = explodePct + '%';
     requestAnimationFrame(function () {
       var s = ensureScene();
       s.resize();
       s.setModel(buildModel(p));
       s.setView('iso');
+      applyExplode();
     });
+  }
+
+  function applyExplode() {
+    if (!currentDetail || !scene) return;
+    var p = currentDetail;
+    explodePct = Math.max(0, Math.min(100, Number($('#explodeRange').value) || 0));
+    var pitch = p.height / Math.max(1, p.layers);
+    var mm = (explodePct / 100) * Math.max(8, pitch * 2.4);
+    var model = buildModel(p);
+    model.viewH = Math.max(usableH(), p.height + Math.max(0, p.layers - 1) * mm);
+    scene.explode = mm;
+    scene.setModel(model);
+    $('#explodeValue').textContent = explodePct + '%';
   }
 
   function closeDetail() {
@@ -754,6 +774,7 @@
       if (card) openDetail(card.dataset.pallet);
     });
     $('#detailBack').addEventListener('click', closeDetail);
+    $('#explodeRange').addEventListener('input', applyExplode);
     $all('#viewSeg button').forEach(function (b) {
       b.addEventListener('click', function () {
         $all('#viewSeg button').forEach(function (x) { x.classList.toggle('active', x === b); });
