@@ -126,6 +126,93 @@
     return best;
   }
 
+  /* 多段递归对拼：允许在一条带里再切一条，把残留区域补满 */
+  function guillotinePattern(L, W, a, b, gap, depth) {
+    depth = depth == null ? 2 : depth;
+    var memo = new Map();
+
+    function bestGrid(l, w) {
+      var g1 = grid(l, w, a, b, gap, false);
+      var g2 = Math.abs(a - b) > EPS ? grid(l, w, b, a, gap, true) : null;
+      var best = g1;
+      if (g2 && (!best || g2.count > best.count)) best = g2;
+      return best;
+    }
+
+    function positions(P) {
+      var set = {};
+      [a, b].forEach(function (d) {
+        if (!(d > EPS)) return;
+        for (var i = 1; i < 200; i++) {
+          var p = i * (d + gap);
+          if (p >= P - EPS) break;
+          if (p > EPS) set[p] = 1;
+          var q = P - p - gap;
+          if (q > EPS) set[q] = 1;
+        }
+      });
+      return Object.keys(set).map(Number).sort(function (x, y) { return x - y; }).slice(0, 80);
+    }
+
+    function solveRect(l, w, d) {
+      if (!(l > EPS) || !(w > EPS)) return { count: 0, rects: [] };
+      var key = round(l, 3) + ':' + round(w, 3) + ':' + d;
+      if (memo.has(key)) return memo.get(key);
+
+      var direct = bestGrid(l, w);
+      var best = direct ? {
+        count: direct.count,
+        rects: direct.rects.slice()
+      } : { count: 0, rects: [] };
+
+      if (d > 0) {
+        var xs = positions(l);
+        for (var i = 0; i < xs.length; i++) {
+          var x = xs[i];
+          var rw = l - x - gap;
+          if (!(rw > EPS)) continue;
+          var left = solveRect(x, w, d - 1);
+          var right = solveRect(rw, w, d - 1);
+          var count = left.count + right.count;
+          if (count > best.count) {
+            best = {
+              count: count,
+              rects: left.rects.concat(right.rects.map(function (r) {
+                return makeRect(r.x + x + gap, r.y, r.w, r.h, r.rot);
+              }))
+            };
+          }
+        }
+
+        var ys = positions(w);
+        for (var j = 0; j < ys.length; j++) {
+          var y = ys[j];
+          var rh = w - y - gap;
+          if (!(rh > EPS)) continue;
+          var top = solveRect(l, y, d - 1);
+          var bottom = solveRect(l, rh, d - 1);
+          var c2 = top.count + bottom.count;
+          if (c2 > best.count) {
+            best = {
+              count: c2,
+              rects: top.rects.concat(bottom.rects.map(function (r) {
+                return makeRect(r.x, r.y + y + gap, r.w, r.h, r.rot);
+              }))
+            };
+          }
+        }
+      }
+
+      memo.set(key, best);
+      return best;
+    }
+
+    var result = solveRect(L, W, depth);
+    if (!result.count) return null;
+    var bb = bounds(result.rects);
+    return { count: result.count, rects: result.rects, usedW: bb.w, usedH: bb.h };
+  }
+
   /* 行/列混排：每一行（列）可以单独选择朝向，动态规划求最优 */
   function stripPattern(L, W, a, b, gap, alongX) {
     var P = alongX ? L : W; // 条带延伸方向
@@ -281,6 +368,7 @@
     if (Math.abs(a - b) > EPS) add(grid(L, W, b, a, gap, true), '整层旋转 90°', 'grid90', 5);
     add(splitPattern(L, W, a, b, gap, true), '纵向对拼', 'splitX', 4);
     add(splitPattern(L, W, a, b, gap, false), '横向对拼', 'splitY', 4);
+    add(guillotinePattern(L, W, a, b, gap, 2), '多段对拼', 'guillotine', 4);
     add(stripPattern(L, W, a, b, gap, true), '横向混排', 'rows', 3);
     add(stripPattern(L, W, a, b, gap, false), '纵向混排', 'cols', 3);
     add(pinwheelPattern(L, W, a, b, gap), '风车拼花', 'pinwheel', 2);
@@ -1765,7 +1853,7 @@
   }
 
   return {
-    version: '1.6.0',
+    version: '1.8.0',
     DEFAULTS: DEFAULTS,
     normalize: normalize,
     orientations: orientations,
