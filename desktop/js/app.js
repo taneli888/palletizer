@@ -761,18 +761,36 @@
     return { x0: minX, y0: minY, x1: maxX, y1: maxY, L: maxX - minX, W: maxY - minY, H: maxZ };
   }
 
-  function solutionLabels(sol) {
+  function solOrientationGroups(sol) {
     if (!sol || !sol.ok || !sol.layer || !sol.layer.rects.length) return [];
-    var r = sol.layer.rects[0];
-    return [{
-      text: state.carton.name + ' ' + fmt(state.carton.l) + '×' + fmt(state.carton.w) + '×' + fmt(state.carton.h),
-      color: '#C99A5F',
-      anchor: {
-        x: r.wx + r.w / 2,
-        y: r.wy + r.h / 2,
-        z: (sol.layers - 1) * sol.pitch + sol.orientation.thickness
+    var groups = {};
+    sol.layer.rects.forEach(function (r) {
+      var thick = r.thickness || sol.orientation.thickness;
+      var key = r.w + '|' + r.h + '|' + thick;
+      if (!groups[key]) {
+        groups[key] = {
+          w: r.w, h: r.h, thickness: thick,
+          count: 0, rect: r, rot: !!r.rot
+        };
       }
-    }];
+      groups[key].count++;
+    });
+    return Object.keys(groups).map(function (k) { return groups[k]; });
+  }
+
+  function solutionLabels(sol) {
+    return solOrientationGroups(sol).map(function (g, i) {
+      var r = g.rect;
+      return {
+        text: state.carton.name + ' ' + fmt(g.w) + '×' + fmt(g.h) + '×' + fmt(g.thickness),
+        color: i === 0 ? '#C99A5F' : '#9FB3A6',
+        anchor: {
+          x: r.wx + r.w / 2,
+          y: r.wy + r.h / 2,
+          z: (sol.layers - 1) * sol.pitch + g.thickness
+        }
+      };
+    });
   }
 
   function palletBoxes(p) {
@@ -782,28 +800,34 @@
       var zTop = z + u.thickness;
       u.rects.forEach(function (r) {
         var si = r.skuIndex != null ? r.skuIndex : u.skuIndex;
+        var thick = r.thickness || u.thickness;
         var color = (mixed && si >= 0) ? PALETTE[si % PALETTE.length] : null;
         boxes.push({
           x: r.wx, y: r.wy, z: z,
-          w: r.w, d: r.h, h: r.thickness || u.thickness,
+          w: r.w, d: r.h, h: thick,
           layer: li, rot: r.rot, color: color, skuIndex: si
         });
-        if (si >= 0 && (!tops[si] || li > tops[si].layer)) {
-          tops[si] = {
+        // 同一 SKU 的不同朝向分别标注，避免接近正方形时看不出方向差异
+        var key = si + '|' + r.w + '|' + r.h + '|' + thick;
+        if (si >= 0 && (!tops[key] || li >= tops[key].layer)) {
+          tops[key] = {
             layer: li,
-            anchor: { x: r.wx + r.w / 2, y: r.wy + r.h / 2, z: z + (r.thickness || u.thickness) }
+            skuIndex: si,
+            w: r.w, h: r.h, thickness: thick,
+            anchor: { x: r.wx + r.w / 2, y: r.wy + r.h / 2, z: z + thick }
           };
         }
       });
       z = zTop + (li < p.units.length - 1 ? state.opts.sheet : 0);
     });
-    var labels = Object.keys(tops).map(function (si) {
-      var sku = state.skus[si] || state.carton;
-      var color = mixed ? PALETTE[Number(si) % PALETTE.length] : '#C99A5F';
+    var labels = Object.keys(tops).map(function (key) {
+      var t = tops[key];
+      var sku = state.skus[t.skuIndex] || state.carton;
+      var color = mixed ? PALETTE[t.skuIndex % PALETTE.length] : '#C99A5F';
       return {
-        text: sku.name + ' ' + fmt(sku.l) + '×' + fmt(sku.w) + '×' + fmt(sku.h),
+        text: sku.name + ' ' + fmt(t.w) + '×' + fmt(t.h) + '×' + fmt(t.thickness),
         color: color,
-        anchor: tops[si].anchor
+        anchor: t.anchor
       };
     });
     return { boxes: boxes, labels: labels };
@@ -945,14 +969,24 @@
       fmt(state.pallet.H + activeDeltas().H) + ' mm · ' + sol.layers + ' 层';
   }
 
-  function layerSVG(sol) {
+  function layerSVG(sol, withLabels) {
     if (!sol || !sol.ok || !sol.layer || !sol.layer.rects.length) return '';
+    var labels = [];
+    if (withLabels) {
+      labels = solOrientationGroups(sol).map(function (g) {
+        var r = g.rect;
+        return {
+          x: r.wx + r.w / 2, y: r.wy + r.h / 2,
+          text: fmt(g.w) + '×' + fmt(g.h) + '×' + fmt(g.thickness)
+        };
+      });
+    }
     return rectsSVG(sol.layer.rects, sol.dims.L, sol.dims.W, function (r) {
       return r.rot ? '#c08b4e' : '#c99a5f';
-    });
+    }, labels);
   }
 
-  function rectsSVG(rects, L, W, colorFn) {
+  function rectsSVG(rects, L, W, colorFn, labels) {
     if (!rects || !rects.length) return '';
     var minX = 0, minY = 0, maxX = L, maxY = W;
     rects.forEach(function (r) {
@@ -971,6 +1005,11 @@
       parts.push('<rect x="' + r.wx + '" y="' + r.wy + '" width="' + r.w + '" height="' + r.h +
         '" rx="0.5" fill="' + colorFn(r) +
         '" stroke="#7c5127" stroke-width="0.55" vector-effect="non-scaling-stroke"/>');
+    });
+    (labels || []).forEach(function (lab) {
+      parts.push('<text x="' + lab.x + '" y="' + lab.y +
+        '" text-anchor="middle" dominant-baseline="middle" font-size="' +
+        Math.max(5, Math.min(L, W) * 0.018) + '" fill="#3d2814">' + esc(lab.text) + '</text>');
     });
     parts.push('</svg>');
     return parts.join('');
@@ -1819,6 +1858,15 @@
       H: Math.max(0, state.pallet.H + activeDeltas().H - state.pallet.base)
     };
     var actual = actualFromBoxes(Core.layerBoxes(sol, 6000)) || { L: 0, W: 0, H: 0 };
+    var orientGroups = solOrientationGroups(sol);
+    var orientRows = orientGroups.map(function (g, i) {
+      return '<tr><td>' + (g.rot ? '旋转 90°' : '平放') + '</td><td>' +
+        fmt(g.w) + ' × ' + fmt(g.h) + ' × ' + fmt(g.thickness) + ' mm</td><td>' +
+        g.count + ' 箱</td></tr>';
+    }).join('');
+    var orientTable = '<h2>单箱尺寸 / 朝向</h2>' +
+      '<table><thead><tr><th>朝向</th><th>实际长 × 宽 × 高</th><th>每层数量</th></tr></thead><tbody>' +
+      orientRows + '</tbody></table>';
     var rows = '';
     if (analysis) {
       rows = analysis.options.map(function (o) {
@@ -1864,7 +1912,7 @@
       '<div class="kpi"><span>实际占用</span><b style="font-size:14px">' + fmt(actual.L) + '×' + fmt(actual.W) + '×' + fmt(actual.H) + '</b></div>' +
       '<div class="kpi"><span>订单需托</span><b>' + (plan ? plan.totalPallets : sol.pallets) + '</b></div>' +
       '</div>' +
-      '<div class="layout"><div class="drawing"><h2>单层排布（俯视）</h2>' + layerSVG(sol) +
+      '<div class="layout"><div class="drawing"><h2>单层排布（俯视）</h2>' + layerSVG(sol, true) +
       '<p class="sub">' + esc(sol.layer.pattern) + ' · 每层 ' + sol.perLayer + ' 箱 · ' + esc(sol.orientation.label) + '</p></div>' +
       '<div class="params"><h2>方案参数</h2>' +
       '<div><span>可用尺寸（长×宽×可用高）</span><b>' + fmt(dims.L) + ' × ' + fmt(dims.W) + ' × ' + fmt(dims.H) + '</b></div>' +
@@ -1878,6 +1926,7 @@
       '<div><span>订单托数</span><b>' + (plan ? plan.totalPallets : sol.pallets) + ' 托（整托 ' +
       (plan ? plan.fullCount : '—') + ' · 混托 ' + (plan ? plan.mixedCount : '—') + '）</b></div>' +
       '</div></div>' +
+      orientTable +
       (planRows ? '<h2>托盘计划（共 ' + plan.totalPallets + ' 托）</h2>' +
         '<table><thead><tr><th>托盘号</th><th>类型</th><th>规格明细</th><th>箱数</th><th>层数</th><th>实际长×宽×高 / 含托盘</th><th>重量kg</th></tr></thead><tbody>' +
         planRows + '</tbody></table>' : '') +
