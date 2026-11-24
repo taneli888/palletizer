@@ -1008,7 +1008,7 @@
       if (r.wx + r.w > maxX) maxX = r.wx + r.w;
       if (r.wy + r.h > maxY) maxY = r.wy + r.h;
     });
-    var outside = actual ? Math.max(38, Math.max(L, W) * 0.11) : 0;
+    var outside = actual ? Math.max(16, Math.min(26, Math.min(L, W) * 0.022)) : 0;
     if (actual) {
       minX = Math.min(minX, -outside - 28);
       maxY = Math.max(maxY, W + outside + 34);
