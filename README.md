@@ -3,7 +3,7 @@
 **托盘码放测算台**  
 A responsive pallet loading calculator for iPhone, iPad and desktop.
 
-**v1.9.3：精确页不内置任何结果，必须自己输入、现场求解并确认后再保存；保存后的同尺寸规则可复用；默认不自动求解。**
+**v1.9.4：精确页支持导入 Python OR-Tools 导出的 JSON 坐标；网页单线程限制说明；时限放宽到 600 秒；不再内置任何布局。**
 
 > 目标部署地址：<https://taneli888.github.io/palletizer/>  
 > GitHub 仓库：<https://github.com/taneli888/palletizer>  
@@ -113,7 +113,10 @@ https://taneli888.github.io/palletizer/exact.html
 - 不参与手机版 / 桌面版的日常计算，离线时不要使用；
 - 首次需要联网加载约 8–20MB 求解器资源，手机 Safari 可能不支持；
 - 只做单层二维排布，不会自动改整托方案；
-- 结果会显示“已证明最优 / 找到更多 / 时限内未证明”，不会把未证明的结果说成最优。
+- 结果会显示“已证明最优 / 找到更多 / 时限内未证明”，不会把未证明的结果说成最优；
+- 支持导入电脑 Python OR-Tools 程序导出的 JSON 坐标（`pallet_w/pallet_h/box_w/box_h/placements`），导入后只做边界/重叠校验，再由你决定是否保存。
+
+网页版 CP-SAT 是单线程的：GitHub Pages 不能设置 COOP/COEP，无法启用多线程共享内存；电脑 Python 版可以开 8 个搜索线程，所以同样时限下更容易找到 20 箱。这是浏览器部署限制，不是模型完全无效。
 
 日常测算仍然使用本地的多段对拼启发式，速度不受影响。
 

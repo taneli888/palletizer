@@ -27,6 +27,7 @@
   button { border: 0; border-radius: 12px; padding: 11px 16px; font: inherit; font-weight: 700; cursor: pointer; }
   #run { background: #1a222c; color: #fff; }
   #run:disabled { opacity: .45; cursor: wait; }
+  #importJson { background: #e8e1d4; color: #3d382f; }
   #reset { background: #eee7db; color: #3d382f; }
   #saveRule { background: #8a5b22; color: #fff; }
   #clearRules { background: #eee7db; color: #6b4b37; }
@@ -63,12 +64,14 @@
       <label class="field"><span>纸箱长 mm</span><input id="cartonL" type="number" min="1" step="1" value="410"></label>
       <label class="field"><span>纸箱宽 mm</span><input id="cartonW" type="number" min="1" step="1" value="130"></label>
       <label class="field"><span>箱间间隙 mm</span><input id="gap" type="number" min="0" step="1" value="0"></label>
-      <label class="field"><span>求解时限 秒</span><input id="timeLimit" type="number" min="5" max="120" step="5" value="30"></label>
+      <label class="field"><span>求解时限 秒</span><input id="timeLimit" type="number" min="5" max="600" step="5" value="30"></label>
     </div>
-    <p class="hint">这是独立实验页，不参与手机版 / 桌面版的日常计算。首次使用需要联网加载 OR-Tools WebAssembly（约 8–20MB），离线时不要使用。手机 Safari 可能不支持。</p>
+    <p class="hint">这是独立实验页，不参与手机版 / 桌面版的日常计算。首次使用需要联网加载 OR-Tools WebAssembly（约 8–20MB），离线时不要使用。手机 Safari 可能不支持。网页版是单线程；电脑 Python 多线程求解更快，可用下面的“导入 Python JSON”。</p>
     <div class="actions">
       <button id="run" type="button">开始精确求解</button>
+      <button id="importJson" type="button">导入 Python JSON</button>
       <button id="reset" type="button">恢复示例</button>
+      <input id="jsonFile" type="file" accept=".json,application/json" hidden>
     </div>
     <div class="status" id="status">等待开始。当前算法会先给出一个可行布局，再尝试多放 1 箱。</div>
   </section>
@@ -106,7 +109,7 @@
       L: Number($('palletL').value), W: Number($('palletW').value),
       a: Number($('cartonL').value), b: Number($('cartonW').value),
       gap: Math.max(0, Number($('gap').value) || 0),
-      timeLimit: Math.max(5, Math.min(120, Number($('timeLimit').value) || 30))
+      timeLimit: Math.max(5, Math.min(600, Number($('timeLimit').value) || 30))
     };
   }
 
@@ -128,6 +131,7 @@
 
   function verdictText(r, base) {
     if (r.count > base) return `多 ${r.count - base} 箱`;
+    if (r.status === 'IMPORTED') return '外部导入';
     if (r.status === 'INFEASIBLE' && r.proven) return '已证明当前最优';
     if (r.status === 'UNKNOWN') return '未找到更优';
     return '未找到更优';
@@ -139,9 +143,11 @@
     $('exactCount').textContent = `${r.count} 箱`;
     $('verdict').textContent = verdictText(r.count, base.count);
     $('elapsed').textContent = `${r.elapsed} 秒 · ${r.status}`;
-    $('note').textContent = r.proven
-      ? '求解器已证明没有更多箱数的布局。'
-      : '求解器在时限内没有证明最优；这不代表一定不能再多放。';
+    $('note').textContent = r.status === 'IMPORTED'
+      ? '这是外部求解器导入的结果；本页只做了边界和重叠校验，没有在这里重新证明最优。'
+      : (r.proven
+        ? '求解器已证明没有更多箱数的布局。'
+        : '求解器在时限内没有证明最优；这不代表一定不能再多放。');
     const rects = (r.rects && r.rects.length) ? r.rects : base.rects;
     draw(v, rects);
     $('result').classList.add('show');
@@ -188,6 +194,59 @@
     } catch (e) {
       $('saveStatus').textContent = '清除失败：' + (e.message || e);
     }
+  }
+
+  function importJsonData(data) {
+    const raw = Array.isArray(data) ? data : (data.placements || data.rects);
+    if (!Array.isArray(raw) || !raw.length) throw new Error('JSON 里没有 placements / rects 坐标数组');
+    const L = Number(data.pallet_w || data.L || $('palletL').value);
+    const W = Number(data.pallet_h || data.W || $('palletW').value);
+    const a = Number(data.box_w || data.a || $('cartonL').value);
+    const b = Number(data.box_h || data.b || $('cartonW').value);
+    const gap = Math.max(0, Number(data.gap || $('gap').value) || 0);
+    if (!(L > 0 && W > 0 && a > 0 && b > 0)) throw new Error('JSON 缺少有效的托盘/纸箱尺寸');
+    const rects = raw.map((p, i) => {
+      const x = Number(p.x), y = Number(p.y), w = Number(p.w), h = Number(p.h);
+      if (![x, y, w, h].every(Number.isFinite) || !(w > 0) || !(h > 0)) {
+        throw new Error(`第 ${i + 1} 个坐标不完整`);
+      }
+      return { x, y, w, h, rot: p.rot != null ? !!p.rot : w < h };
+    });
+    for (let i = 0; i < rects.length; i++) {
+      const r = rects[i];
+      if (r.x < 0 || r.y < 0 || r.x + r.w > L + 1e-6 || r.y + r.h > W + 1e-6) {
+        throw new Error(`第 ${i + 1} 个箱子超出托盘`);
+      }
+      for (let j = i + 1; j < rects.length; j++) {
+        const s = rects[j];
+        const ox = Math.min(r.x + r.w, s.x + s.w) - Math.max(r.x, s.x);
+        const oy = Math.min(r.y + r.h, s.y + s.h) - Math.max(r.y, s.y);
+        if (ox > 1e-6 && oy > 1e-6) throw new Error(`第 ${i + 1} 和 ${j + 1} 个箱子重叠`);
+      }
+    }
+    $('palletL').value = L; $('palletW').value = W;
+    $('cartonL').value = a; $('cartonW').value = b; $('gap').value = gap;
+    const v = { L, W, a, b, gap, timeLimit: values().timeLimit };
+    const base = heuristic(v);
+    showResult(v, base, {
+      count: rects.length, rects, status: 'IMPORTED', elapsed: 0,
+      proven: false, supported: true
+    });
+    $('status').textContent = `已导入外部结果：${rects.length} 箱/层。确认无误后可以保存到测算台。`;
+  }
+
+  function importJsonFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        importJsonData(JSON.parse(String(reader.result)));
+      } catch (e) {
+        $('status').textContent = '导入失败：' + (e.message || e);
+      }
+    };
+    reader.onerror = () => { $('status').textContent = '文件读取失败。'; };
+    reader.readAsText(file, 'utf-8');
   }
 
   async function run() {
@@ -238,6 +297,12 @@
   $('run').addEventListener('click', run);
   $('saveRule').addEventListener('click', saveRule);
   $('clearRules').addEventListener('click', clearRules);
+  $('importJson').addEventListener('click', () => $('jsonFile').click());
+  $('jsonFile').addEventListener('change', (e) => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    importJsonFile(f);
+  });
   $('reset').addEventListener('click', () => {
     const d = { palletL: 1072, palletW: 1072, cartonL: 410, cartonW: 130, gap: 0, timeLimit: 30 };
     Object.keys(d).forEach(k => { $(k).value = d[k]; });
