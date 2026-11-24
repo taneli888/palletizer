@@ -393,8 +393,62 @@
   };
 
   Scene3D.prototype._drawCartonLabels = function (ctx, cam, labels) {
+    function dimArrow(a, b, color) {
+      var ang = Math.atan2(b.y - a.y, b.x - a.x);
+      var size = 5;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(b.x, b.y);
+      ctx.lineTo(b.x - size * Math.cos(ang - 0.4), b.y - size * Math.sin(ang - 0.4));
+      ctx.lineTo(b.x - size * Math.cos(ang + 0.4), b.y - size * Math.sin(ang + 0.4));
+      ctx.closePath();
+      ctx.fill();
+    }
+    function dimPill(text, x, y, color) {
+      ctx.font = '600 10px "Segoe UI","Microsoft YaHei",sans-serif';
+      var tw = ctx.measureText(text).width;
+      var bw = tw + 10, bh = 17;
+      var rx = x - bw / 2, ry = y - bh / 2;
+      ctx.fillStyle = 'rgba(9,14,19,.88)';
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(rx + 4, ry);
+      ctx.arcTo(rx + bw, ry, rx + bw, ry + bh, 4);
+      ctx.arcTo(rx + bw, ry + bh, rx, ry + bh, 4);
+      ctx.arcTo(rx, ry + bh, rx, ry, 4);
+      ctx.arcTo(rx, ry, rx + bw, ry, 4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#f5e9d5';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, x, y + 0.5);
+    }
+    function drawDims(label) {
+      var color = label.color || '#C99A5F';
+      (label.dims || []).forEach(function (d) {
+        var a = self._project(cam, [d.a.x, d.a.y, d.a.z]);
+        var b = self._project(cam, [d.b.x, d.b.y, d.b.z]);
+        if (!a || !b) return;
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+        dimArrow(a, b, color);
+        dimArrow(b, a, color);
+        ctx.restore();
+        dimPill(d.text, (a.x + b.x) / 2, (a.y + b.y) / 2 + (Math.abs(b.x - a.x) > Math.abs(b.y - a.y) ? -14 : 0), color);
+      });
+    }
+    var self = this;
     for (var i = 0; i < labels.length; i++) {
       var label = labels[i];
+      drawDims(label);
       var p = this._project(cam, [label.anchor.x, label.anchor.y, label.anchor.z]);
       if (!p) continue;
       var text = String(label.text || '');

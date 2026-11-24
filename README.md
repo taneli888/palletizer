@@ -3,7 +3,7 @@
 **托盘码放测算台**  
 A responsive pallet loading calculator for iPhone, iPad and desktop.
 
-**v1.9.11：3D 与打印/PDF 按实际朝向分别标注单箱尺寸；同朝向只标一个，混排朝向会分别标注，并增加打印的“单箱尺寸 / 朝向”表。**
+**v1.9.12：3D 单箱尺寸增加 CAD 风格双向箭头标注；打印/PDF 俯视图也带箭头尺寸线，并按朝向分别标注。**
 
 > 目标部署地址：<https://taneli888.github.io/palletizer/>  
 > GitHub 仓库：<https://github.com/taneli888/palletizer>  

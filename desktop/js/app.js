@@ -781,14 +781,19 @@
   function solutionLabels(sol) {
     return solOrientationGroups(sol).map(function (g, i) {
       var r = g.rect;
+      var z = (sol.layers - 1) * sol.pitch + g.thickness;
       return {
         text: state.carton.name + ' ' + fmt(g.w) + '×' + fmt(g.h) + '×' + fmt(g.thickness),
         color: i === 0 ? '#C99A5F' : '#9FB3A6',
         anchor: {
           x: r.wx + r.w / 2,
           y: r.wy + r.h / 2,
-          z: (sol.layers - 1) * sol.pitch + g.thickness
-        }
+          z: z
+        },
+        dims: [
+          { a: { x: r.wx, y: r.wy, z: z }, b: { x: r.wx + r.w, y: r.wy, z: z }, text: fmt(g.w) },
+          { a: { x: r.wx, y: r.wy, z: z }, b: { x: r.wx, y: r.wy + r.h, z: z }, text: fmt(g.h) }
+        ]
       };
     });
   }
@@ -827,7 +832,13 @@
       return {
         text: sku.name + ' ' + fmt(t.w) + '×' + fmt(t.h) + '×' + fmt(t.thickness),
         color: color,
-        anchor: t.anchor
+        anchor: t.anchor,
+        dims: [
+          { a: { x: t.anchor.x - t.w / 2, y: t.anchor.y - t.h / 2, z: t.anchor.z },
+            b: { x: t.anchor.x + t.w / 2, y: t.anchor.y - t.h / 2, z: t.anchor.z }, text: fmt(t.w) },
+          { a: { x: t.anchor.x - t.w / 2, y: t.anchor.y - t.h / 2, z: t.anchor.z },
+            b: { x: t.anchor.x - t.w / 2, y: t.anchor.y + t.h / 2, z: t.anchor.z }, text: fmt(t.h) }
+        ]
       };
     });
     return { boxes: boxes, labels: labels };
@@ -977,6 +988,8 @@
         var r = g.rect;
         return {
           x: r.wx + r.w / 2, y: r.wy + r.h / 2,
+          x0: r.wx, y0: r.wy, w: r.w, h: r.h,
+          wText: fmt(g.w), hText: fmt(g.h),
           text: fmt(g.w) + '×' + fmt(g.h) + '×' + fmt(g.thickness)
         };
       });
@@ -1000,6 +1013,10 @@
       (maxX - minX + pad * 2) + ' ' + (maxY - minY + pad * 2);
     var parts = [];
     parts.push('<svg viewBox="' + vb + '" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">');
+    if (labels && labels.length) {
+      parts.push('<defs><marker id="dimArrow" markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto">' +
+        '<path d="M0 0 L7 3.5 L0 7 Z" fill="#8a4b22"/></marker></defs>');
+    }
     parts.push('<rect x="0" y="0" width="' + L + '" height="' + W + '" fill="#f7f1e5" stroke="#b9ab92" stroke-width="0.9" stroke-dasharray="3 2" vector-effect="non-scaling-stroke"/>');
     rects.forEach(function (r) {
       parts.push('<rect x="' + r.wx + '" y="' + r.wy + '" width="' + r.w + '" height="' + r.h +
@@ -1007,9 +1024,19 @@
         '" stroke="#7c5127" stroke-width="0.55" vector-effect="non-scaling-stroke"/>');
     });
     (labels || []).forEach(function (lab) {
-      parts.push('<text x="' + lab.x + '" y="' + lab.y +
-        '" text-anchor="middle" dominant-baseline="middle" font-size="' +
-        Math.max(5, Math.min(L, W) * 0.018) + '" fill="#3d2814">' + esc(lab.text) + '</text>');
+      var fs = Math.max(5, Math.min(L, W) * 0.018);
+      var midX = lab.x0 + lab.w / 2;
+      var midY = lab.y0 + lab.h / 2;
+      var lineY = lab.y0 + lab.h * 0.72;
+      var lineX = lab.x0 + lab.w * 0.72;
+      parts.push('<line x1="' + lab.x0 + '" y1="' + lineY + '" x2="' + (lab.x0 + lab.w) + '" y2="' + lineY +
+        '" stroke="#8a4b22" stroke-width="0.7" vector-effect="non-scaling-stroke" marker-start="url(#dimArrow)" marker-end="url(#dimArrow)"/>');
+      parts.push('<text x="' + midX + '" y="' + (lineY - fs * 0.45) + '" text-anchor="middle" font-size="' + fs +
+        '" fill="#6b3a1c">' + esc(lab.wText) + '</text>');
+      parts.push('<line x1="' + lineX + '" y1="' + lab.y0 + '" x2="' + lineX + '" y2="' + (lab.y0 + lab.h) +
+        '" stroke="#8a4b22" stroke-width="0.7" vector-effect="non-scaling-stroke" marker-start="url(#dimArrow)" marker-end="url(#dimArrow)"/>');
+      parts.push('<text x="' + (lineX - fs * 0.4) + '" y="' + midY + '" text-anchor="end" dominant-baseline="middle" font-size="' + fs +
+        '" fill="#6b3a1c">' + esc(lab.hText) + '</text>');
     });
     parts.push('</svg>');
     return parts.join('');
