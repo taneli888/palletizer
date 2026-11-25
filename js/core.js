@@ -11,6 +11,7 @@
   'use strict';
 
   var EPS = 1e-6;
+  var SUPPORT_MIN = 0.85;
 
   function n(v, d) {
     var x = Number(v);
@@ -943,6 +944,116 @@
     };
   }
 
+  function supportRatio(topRects, belowRects) {
+    if (!topRects || !topRects.length) return 1;
+    if (!belowRects || !belowRects.length) return 0;
+    var min = 1, sum = 0, areaSum = 0;
+    topRects.forEach(function (r) {
+      var area = r.w * r.h;
+      if (!(area > 0)) return;
+      var covered = 0;
+      belowRects.forEach(function (b) {
+        var ox = Math.min(r.wx + r.w, b.wx + b.w) - Math.max(r.wx, b.wx);
+        var oy = Math.min(r.wy + r.h, b.wy + b.h) - Math.max(r.wy, b.wy);
+        if (ox > 0 && oy > 0) covered += ox * oy;
+      });
+      var ratio = Math.min(1, covered / area);
+      min = Math.min(min, ratio);
+      sum += ratio * area;
+      areaSum += area;
+    });
+    return { min: min, avg: areaSum ? sum / areaSum : 1 };
+  }
+
+  function palletSupport(p) {
+    var min = 1, sum = 0, layers = 0, low = [];
+    for (var i = 1; i < p.units.length; i++) {
+      var s = supportRatio(p.units[i].rects, p.units[i - 1].rects);
+      min = Math.min(min, s.min);
+      sum += s.avg;
+      layers++;
+      if (s.min < SUPPORT_MIN) low.push(i + 1);
+    }
+    return { min: layers ? min : 1, avg: layers ? sum / layers : 1, lowLayers: low };
+  }
+
+  function rectSignature(rects) {
+    return rects.map(function (r) {
+      return [round(r.x, 2), round(r.y, 2), round(r.w, 2), round(r.h, 2), r.rot ? 1 : 0].join(',');
+    }).sort().join('|');
+  }
+
+  function makeLayerVariant(cfg, sol, skuIndex, count, kind) {
+    var base = makeLayerUnit(cfg, sol, skuIndex, count, false);
+    var L = sol.effective.L, W = sol.effective.W;
+    var ox = sol.effective.originX, oy = sol.effective.originY;
+    var usedW = 0, usedH = 0;
+    base.rects.forEach(function (r) {
+      usedW = Math.max(usedW, r.x + r.w);
+      usedH = Math.max(usedH, r.y + r.h);
+    });
+    var freeW = Math.max(0, L - usedW);
+    var freeH = Math.max(0, W - usedH);
+    var dx = 0, dy = 0;
+    if (kind === 'shiftX') dx = Math.min(freeW / 2, Math.max(1, sol.orientation.b * 0.25));
+    if (kind === 'shiftY') dy = Math.min(freeH / 2, Math.max(1, sol.orientation.b * 0.25));
+    var rects = base.rects.map(function (r) {
+      var x = r.x, y = r.y, w = r.w, h = r.h, rot = !!r.rot;
+      if (kind === 'mirrorX') {
+        x = L - r.x - r.w;
+      } else if (kind === 'mirrorY') {
+        y = W - r.y - r.h;
+      } else if (kind === 'rot180') {
+        x = L - r.x - r.w;
+        y = W - r.y - r.h;
+      } else if (kind === 'rot90') {
+        x = W - r.y - r.h;
+        y = r.x;
+        w = r.h;
+        h = r.w;
+        rot = !rot;
+      } else if (kind === 'shiftX') {
+        x = r.x + dx;
+      } else if (kind === 'shiftY') {
+        y = r.y + dy;
+      }
+      return {
+        x: x, y: y, w: w, h: h, rot: rot,
+        wx: ox + x, wy: oy + y,
+        skuIndex: r.skuIndex, thickness: r.thickness
+      };
+    });
+    if (rects.some(function (r) {
+      return r.x < -EPS || r.y < -EPS || r.x + r.w > L + EPS || r.y + r.h > W + EPS;
+    })) return null;
+    if (kind === 'shiftX' && !(dx > EPS)) return null;
+    if (kind === 'shiftY' && !(dy > EPS)) return null;
+    var unit = Object.assign({}, base, {
+      rects: rects,
+      pattern: base.pattern + ' · 交错层',
+      interlockKind: kind
+    });
+    if (rectSignature(rects) === rectSignature(base.rects)) return null;
+    return unit;
+  }
+
+  function chooseInterlockUnit(cfg, sol, skuIndex, count) {
+    var base = makeLayerUnit(cfg, sol, skuIndex, count, false);
+    var kinds = Math.abs(sol.effective.L - sol.effective.W) <= 0.5
+      ? ['rot90', 'rot180', 'mirrorX', 'mirrorY', 'shiftX', 'shiftY']
+      : ['rot180', 'mirrorX', 'mirrorY', 'shiftX', 'shiftY'];
+    for (var i = 0; i < kinds.length; i++) {
+      var unit = makeLayerVariant(cfg, sol, skuIndex, count, kinds[i]);
+      if (!unit) continue;
+      var a = supportRatio(unit.rects, base.rects);
+      var b = supportRatio(base.rects, unit.rects);
+      if (a.min >= SUPPORT_MIN && b.min >= SUPPORT_MIN) {
+        return { base: base, alt: unit, kind: kinds[i] };
+      }
+    }
+    return { base: base, alt: null, kind: '' };
+  }
+
   function refreshPallet(p, cfg) {
     var height = 0, weight = 0, boxes = 0, bySku = {};
     var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -1583,13 +1694,19 @@
       var partial = qty - fullLayerTotal * perLayer;
       var fullPalletCount = Math.floor(fullLayerTotal / maxFull);
       var left = fullLayerTotal % maxFull;
-      var baseUnit = makeLayerUnit(cfg, sol, si, perLayer, false);
+      var layerVariants = chooseInterlockUnit(cfg, sol, si, perLayer);
+      var baseUnit = layerVariants.base;
+      var altUnit = layerVariants.alt;
       var fullPallets = [];
 
       for (var p = 0; p < fullPalletCount; p++) {
         var units = [];
-        for (var k = 0; k < maxFull; k++) units.push(baseUnit);
-        fullPallets.push(makePallet(units, cfg, 'full', si));
+        for (var k = 0; k < maxFull; k++) {
+          units.push(altUnit && k % 2 ? altUnit : baseUnit);
+        }
+        var fp = makePallet(units, cfg, 'full', si);
+        fp.interlock = altUnit && maxFull > 1 ? layerVariants.kind : '';
+        fullPallets.push(fp);
       }
 
       // 尾箱优先塞进同规格整托的剩余高度/载重（例如 110 箱 / 54 箱一托 → 2 托）
@@ -1666,6 +1783,42 @@
     }
     plan.flattened = Math.max(0, beforePartial - plan.partialTopCount);
     plan.partialTopCount = plan.partialTopCount || 0;
+    annotateStability(plan);
+    return plan;
+  }
+
+  function annotateStability(plan) {
+    var min = 1, low = 0, interlocked = 0, kinds = {};
+    plan.pallets.forEach(function (p) {
+      var s = palletSupport(p);
+      p.support = s;
+      min = Math.min(min, s.min);
+      if (s.lowLayers.length) low++;
+      if (p.interlock) {
+        interlocked++;
+        kinds[p.interlock] = (kinds[p.interlock] || 0) + 1;
+      }
+    });
+    plan.supportMin = min;
+    plan.lowSupportPallets = low;
+    plan.interlockPallets = interlocked;
+    plan.interlockKinds = kinds;
+    var parts = [];
+    if (interlocked) {
+      var label = { rot90: '旋转 90°', rot180: '旋转 180°', mirrorX: '镜像 X', mirrorY: '镜像 Y' };
+      var kindText = Object.keys(kinds).map(function (k) { return label[k] || k; }).join(' / ');
+      parts.push('层间交错：' + interlocked + ' 托采用 ' + kindText);
+    } else {
+      parts.push('层型镜像/旋转后没有有效差异，层间仍为对齐堆叠；建议加 3–5mm 层间垫板并配合缠绕膜/护角，或调整箱型/层型实现错缝。若加垫板后超高，需要增加托盘');
+    }
+    if (low) {
+      parts.push('支撑检查：' + low + ' 托存在最低支撑率 < 85% 的层；建议加硬质层间垫板，或拆分为额外托盘' +
+        (plan.interlockPallets ? '（交错层也建议配合垫板/缠绕膜）' : '') +
+        '。若加垫板后超高，需要增加托盘。');
+    } else {
+      parts.push('支撑检查：最低 ' + Math.round(min * 100) + '%（≥85%）');
+    }
+    plan.stabilityAdvice = parts.join('；');
     return plan;
   }
 
@@ -1902,6 +2055,7 @@
         return (p.skuBreakdown[info.index] || 0) > 0;
       }).length;
     });
+    annotateStability(plan);
     return plan;
   }
 

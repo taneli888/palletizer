@@ -1201,6 +1201,11 @@
     if (strategyNote) {
       summary.insertAdjacentHTML('beforeend', '<div class="plan-note">' + strategyNote + '</div>');
     }
+    if (plan.stabilityAdvice) {
+      summary.insertAdjacentHTML('beforeend',
+        '<div class="plan-note' + (plan.lowSupportPallets ? ' warn' : '') + '">' +
+        esc(plan.stabilityAdvice) + '</div>');
+    }
 
     skuEl.innerHTML = plan.skus.map(function (info, i) {
       if (plan.globalUsed) {
@@ -2039,11 +2044,15 @@
       '<div><span>实际码放（长×宽×高）</span><b>' + fmt(actual.L) + ' × ' + fmt(actual.W) + ' × ' + fmt(actual.H) + ' mm</b></div>' +
       '<div><span>含托盘总高</span><b>' + fmt(actual.H + state.pallet.base) + ' mm</b></div>' +
       '<div><span>层高 / 占用高</span><b>' + fmt(sol.pitch) + ' / ' + fmt(sol.usedHeight) + ' mm</b></div>' +
+      '<div><span>层间交错 / 最低支撑</span><b>' +
+      (plan ? (plan.interlockPallets + ' 托交错 / ' + Math.round((plan.supportMin || 1) * 100) + '%') : '—') +
+      '</b></div>' +
       '<div><span>单箱重量 / 单托重量</span><b>' + fmt(state.carton.weight) + ' / ' + fmt(sol.weight) + ' kg</b></div>' +
       '<div><span>订单数量</span><b>' + fmt(state.carton.qty) + ' 箱</b></div>' +
       '<div><span>订单托数</span><b>' + (plan ? plan.totalPallets : sol.pallets) + ' 托（整托 ' +
       (plan ? plan.fullCount : '—') + ' · 混托 ' + (plan ? plan.mixedCount : '—') + '）</b></div>' +
       '</div></div>' +
+      (plan && plan.stabilityAdvice ? '<p class="sub">' + esc(plan.stabilityAdvice) + '</p>' : '') +
       orientTable +
       (planRows ? '<h2>托盘计划（共 ' + plan.totalPallets + ' 托）</h2>' +
         '<table><thead><tr><th>托盘号</th><th>类型</th><th>规格明细</th><th>箱数</th><th>层数</th><th>实际长×宽×高 / 含托盘</th><th>重量kg</th></tr></thead><tbody>' +
