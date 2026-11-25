@@ -10,7 +10,7 @@
     pallet: { L: 1200, W: 800, H: 1100, base: 145 },
     carton: { name: '示例纸箱', l: 368, w: 236, h: 153, qty: 300, weight: 10 },
     opts: {
-      gap: 0, margin: 0, sheet: 0, overhang: 0, maxLoad: 0, maxLayers: 0,
+      gap: 0, margin: 0, sheet: 0, sheetEvery: 2, overhang: 0, maxLoad: 0, maxLayers: 0,
       allowSide: false, allowUprightLay: false, allowSmallBottom: true, globalOptimize: false
     },
     limits: { L: 20, W: 0, H: 6 },
@@ -76,7 +76,7 @@
         });
       }
       if (saved && saved.opts) {
-        ['gap', 'margin', 'sheet', 'overhang', 'maxLoad', 'maxLayers'].forEach(function (k) {
+        ['gap', 'margin', 'sheet', 'sheetEvery', 'overhang', 'maxLoad', 'maxLayers'].forEach(function (k) {
           if (isFinite(saved.opts[k])) s.opts[k] = Math.max(0, Number(saved.opts[k]));
         });
         s.opts.allowSide = !!saved.opts.allowSide;
@@ -142,6 +142,7 @@
     $('#optGap').value = fmt(state.opts.gap);
     $('#optMargin').value = fmt(state.opts.margin);
     $('#optSheet').value = fmt(state.opts.sheet);
+    $('#optSheetEvery').value = fmt(state.opts.sheetEvery);
     $('#optOverhang').value = fmt(state.opts.overhang);
     $('#optMaxLoad').value = fmt(state.opts.maxLoad);
     $('#optMaxLayers').value = fmt(state.opts.maxLayers);
@@ -169,6 +170,7 @@
     };
     state.opts = {
       gap: numInput('optGap'), margin: numInput('optMargin'), sheet: numInput('optSheet'),
+      sheetEvery: Math.max(1, Math.floor(numInput('optSheetEvery'))),
       overhang: numInput('optOverhang'), maxLoad: numInput('optMaxLoad'),
       maxLayers: Math.floor(numInput('optMaxLayers')),
       allowSide: $('#allowSide').checked,
@@ -204,6 +206,7 @@
       pallet: state.pallet,
       carton: carton || state.carton,
       gap: state.opts.gap, margin: state.opts.margin, sheet: state.opts.sheet,
+      sheetEvery: state.opts.sheetEvery,
       overhang: state.opts.overhang, maxLoad: state.opts.maxLoad,
       maxLayers: state.opts.maxLayers,
       allowFlat: true,
@@ -537,7 +540,8 @@
 
     $('#kpiLayers').innerHTML = ok ? sol.layers + '<span class="unit">层</span>' : '—';
     $('#kpiPitch').textContent = ok
-      ? ('层高 ' + fmt(sol.pitch) + ' mm' + (state.opts.sheet > 0 ? ' · 含垫板' : ''))
+      ? ('层高 ' + fmt(sol.pitch) + ' mm' +
+        (sol.sheetCount > 0 ? ' · ' + sol.sheetCount + ' 块层板（每 ' + state.opts.sheetEvery + ' 层）' : ''))
       : '—';
 
     $('#kpiTotal').innerHTML = ok ? sol.total + '<span class="unit">箱</span>' : '—';
@@ -823,7 +827,9 @@
           };
         }
       });
-      z = zTop + (li < p.units.length - 1 ? state.opts.sheet : 0);
+      var board = li < p.units.length - 1 && state.opts.sheet > 0 &&
+        state.opts.sheetEvery > 0 && (li + 1) % state.opts.sheetEvery === 0;
+      z = zTop + (board ? state.opts.sheet : 0);
     });
     var labels = Object.keys(tops).map(function (key) {
       var t = tops[key];
@@ -871,7 +877,9 @@
     }
     var t = baseSolution.orientation.thickness;
     var s = state.opts.sheet;
-    var need = baseSolution.usedHeight + t + s;
+    var board = baseSolution.layers > 0 && s > 0 && state.opts.sheetEvery > 0 &&
+      baseSolution.layers % state.opts.sheetEvery === 0;
+    var need = baseSolution.usedHeight + t + (board ? s : 0);
     var usable = Math.max(0, state.pallet.H - state.pallet.base);
     var delta = need - usable;
     if (!(delta > 0)) return '';
@@ -1953,14 +1961,18 @@
       var pv = state.palletView;
       var acc = 0;
       pv.units.forEach(function (u, i) {
-        acc += u.thickness + (i ? state.opts.sheet : 0);
+        acc += u.thickness;
+        if (i > 0 && state.opts.sheet > 0 && state.opts.sheetEvery > 0 && i % state.opts.sheetEvery === 0) {
+          acc += state.opts.sheet;
+        }
         lay.push([i + 1, unitLabel(u), u.count, u.thickness, Math.round(acc)]);
       });
       sheets.push({ name: '逐层明细', cols: [8, 20, 9, 10, 11], rows: lay });
     } else if (currentSolution && currentSolution.ok) {
       for (var i = 0; i < currentSolution.layers; i++) {
         lay.push([i + 1, state.carton.name, currentSolution.perLayer, currentSolution.orientation.thickness,
-          Math.round((i + 1) * currentSolution.orientation.thickness + i * state.opts.sheet)]);
+          Math.round((i + 1) * currentSolution.orientation.thickness +
+            Math.floor(i / Math.max(1, state.opts.sheetEvery)) * state.opts.sheet)]);
       }
       sheets.push({ name: '逐层明细', cols: [8, 20, 9, 10, 11], rows: lay });
     }
@@ -2043,7 +2055,8 @@
       '<div><span>纸箱外径</span><b>' + fmt(state.carton.l) + ' × ' + fmt(state.carton.w) + ' × ' + fmt(state.carton.h) + '</b></div>' +
       '<div><span>实际码放（长×宽×高）</span><b>' + fmt(actual.L) + ' × ' + fmt(actual.W) + ' × ' + fmt(actual.H) + ' mm</b></div>' +
       '<div><span>含托盘总高</span><b>' + fmt(actual.H + state.pallet.base) + ' mm</b></div>' +
-      '<div><span>层高 / 占用高</span><b>' + fmt(sol.pitch) + ' / ' + fmt(sol.usedHeight) + ' mm</b></div>' +
+      '<div><span>层高 / 占用高</span><b>' + fmt(sol.pitch) + ' / ' + fmt(sol.usedHeight) + ' mm' +
+      (sol.sheetCount > 0 ? '（' + sol.sheetCount + ' 块层板）' : '') + '</b></div>' +
       '<div><span>层间交错 / 最低支撑</span><b>' +
       (plan ? (plan.interlockPallets + ' 托交错 / ' + Math.round((plan.supportMin || 1) * 100) + '%') : '—') +
       '</b></div>' +

@@ -445,6 +445,7 @@
     gap: 0,
     margin: 0,
     sheet: 0,
+    sheetEvery: 2,
     overhang: 0,
     maxLoad: 0,
     maxLayers: 0,
@@ -478,6 +479,7 @@
       gap: Math.max(0, n(raw.gap, 0)),
       margin: Math.max(0, n(raw.margin, 0)),
       sheet: Math.max(0, n(raw.sheet, 0)),
+      sheetEvery: Math.max(0, Math.floor(n(raw.sheetEvery, DEFAULTS.sheetEvery))),
       overhang: Math.max(0, n(raw.overhang, 0)),
       maxLoad: Math.max(0, n(raw.maxLoad, 0)),
       maxLayers: Math.max(0, Math.floor(n(raw.maxLayers, 0))),
@@ -490,6 +492,29 @@
     };
     cfg.stackH = cfg.pallet.stackH;
     return cfg;
+  }
+
+  function sheetCountFor(layers, cfg) {
+    if (!(layers > 1) || !(cfg.sheet > 0) || !(cfg.sheetEvery > 0)) return 0;
+    return Math.floor((layers - 1) / cfg.sheetEvery);
+  }
+
+  function layerHeightFor(layers, thickness, cfg) {
+    if (!(layers > 0)) return 0;
+    return layers * thickness + sheetCountFor(layers, cfg) * cfg.sheet;
+  }
+
+  function nextLayerHeight(existingLayers, thickness, cfg) {
+    var board = existingLayers > 0 && cfg.sheet > 0 && cfg.sheetEvery > 0 &&
+      existingLayers % cfg.sheetEvery === 0;
+    return thickness + (board ? cfg.sheet : 0);
+  }
+
+  function maxLayersByHeight(H, thickness, cfg) {
+    if (!(thickness > 0)) return 0;
+    var max = Math.floor((H + EPS) / thickness);
+    while (max > 0 && layerHeightFor(max, thickness, cfg) > H + EPS) max--;
+    return max;
   }
 
   function orientations(cfg) {
@@ -561,8 +586,7 @@
     var qty = cfg.carton.qty;
 
     function addCandidate(o, layer) {
-      var pitch = o.thickness + cfg.sheet;
-      var layers = Math.floor((H + cfg.sheet + EPS) / pitch);
+      var layers = maxLayersByHeight(H, o.thickness, cfg);
       if (!layers) return;
 
       var capByLayer = cfg.maxLayers > 0 ? cfg.maxLayers : Infinity;
@@ -582,9 +606,11 @@
       if (layers <= 0) return;
 
       var total = layers * layer.count;
-      var usedHeight = layers * o.thickness + Math.max(0, layers - 1) * cfg.sheet;
+      var usedHeight = layerHeightFor(layers, o.thickness, cfg);
       var weight = total * cfg.carton.weight;
       var vol = cfg.carton.l * cfg.carton.w * cfg.carton.h * total;
+      var boards = sheetCountFor(layers, cfg);
+      var pitch = layers > 1 ? usedHeight / layers : o.thickness;
 
       var cand = {
         orientation: o,
@@ -593,6 +619,7 @@
         total: total,
         pitch: pitch,
         usedHeight: usedHeight,
+        sheetCount: boards,
         weight: weight,
         areaUtil: layer.count * o.a * o.b / (effL * effW),
         volUtil: vol / (L * W * H),
@@ -627,6 +654,7 @@
     result.perLayer = best.layer.count;
     result.pitch = best.pitch;
     result.usedHeight = best.usedHeight;
+    result.sheetCount = best.sheetCount;
     result.weight = best.weight;
     result.areaUtil = best.areaUtil;
     result.volUtil = best.volUtil;
@@ -745,8 +773,7 @@
           row.push({
             perLayer: layer.count,
             thickness: ors[o].thickness,
-            capByWeight: capByWeight,
-            pitch: ors[o].thickness + cfg.sheet
+            capByWeight: capByWeight
           });
         }
         pairData.push({ dL: dLs[i], dW: dWs[j], orients: row });
@@ -762,7 +789,7 @@
         for (o = 0; o < pair.orients.length; o++) {
           var d = pair.orients[o];
           if (!d.perLayer) continue;
-          var nL = Math.floor((H + cfg.sheet + EPS) / d.pitch);
+          var nL = maxLayersByHeight(H, d.thickness, cfg);
           if (cfg.maxLayers > 0) nL = Math.min(nL, cfg.maxLayers);
           if (d.capByWeight >= 0) nL = Math.min(nL, d.capByWeight);
           if (nL <= 0) continue;
@@ -987,16 +1014,6 @@
     var base = makeLayerUnit(cfg, sol, skuIndex, count, false);
     var L = sol.effective.L, W = sol.effective.W;
     var ox = sol.effective.originX, oy = sol.effective.originY;
-    var usedW = 0, usedH = 0;
-    base.rects.forEach(function (r) {
-      usedW = Math.max(usedW, r.x + r.w);
-      usedH = Math.max(usedH, r.y + r.h);
-    });
-    var freeW = Math.max(0, L - usedW);
-    var freeH = Math.max(0, W - usedH);
-    var dx = 0, dy = 0;
-    if (kind === 'shiftX') dx = Math.min(freeW / 2, Math.max(1, sol.orientation.b * 0.25));
-    if (kind === 'shiftY') dy = Math.min(freeH / 2, Math.max(1, sol.orientation.b * 0.25));
     var rects = base.rects.map(function (r) {
       var x = r.x, y = r.y, w = r.w, h = r.h, rot = !!r.rot;
       if (kind === 'mirrorX') {
@@ -1012,10 +1029,6 @@
         w = r.h;
         h = r.w;
         rot = !rot;
-      } else if (kind === 'shiftX') {
-        x = r.x + dx;
-      } else if (kind === 'shiftY') {
-        y = r.y + dy;
       }
       return {
         x: x, y: y, w: w, h: h, rot: rot,
@@ -1026,8 +1039,6 @@
     if (rects.some(function (r) {
       return r.x < -EPS || r.y < -EPS || r.x + r.w > L + EPS || r.y + r.h > W + EPS;
     })) return null;
-    if (kind === 'shiftX' && !(dx > EPS)) return null;
-    if (kind === 'shiftY' && !(dy > EPS)) return null;
     var unit = Object.assign({}, base, {
       rects: rects,
       pattern: base.pattern + ' · 交错层',
@@ -1040,8 +1051,8 @@
   function chooseInterlockUnit(cfg, sol, skuIndex, count) {
     var base = makeLayerUnit(cfg, sol, skuIndex, count, false);
     var kinds = Math.abs(sol.effective.L - sol.effective.W) <= 0.5
-      ? ['rot90', 'rot180', 'mirrorX', 'mirrorY', 'shiftX', 'shiftY']
-      : ['rot180', 'mirrorX', 'mirrorY', 'shiftX', 'shiftY'];
+      ? ['rot90', 'rot180', 'mirrorX', 'mirrorY']
+      : ['rot180', 'mirrorX', 'mirrorY'];
     for (var i = 0; i < kinds.length; i++) {
       var unit = makeLayerVariant(cfg, sol, skuIndex, count, kinds[i]);
       if (!unit) continue;
@@ -1059,7 +1070,7 @@
     var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (var i = 0; i < p.units.length; i++) {
       var u = p.units[i];
-      height += u.thickness + (i ? cfg.sheet : 0);
+      height += u.thickness + (i > 0 && cfg.sheet > 0 && cfg.sheetEvery > 0 && i % cfg.sheetEvery === 0 ? cfg.sheet : 0);
       weight += u.weight;
       boxes += u.count;
       if (u.parts) {
@@ -1545,7 +1556,7 @@
         var p = pallets[i];
         if (p.partials + (u.partial ? 1 : 0) > maxPartials) continue;
         if (cfg.maxLayers > 0 && p.layers >= cfg.maxLayers) continue;
-        var extra = u.thickness + (p.layers ? cfg.sheet : 0);
+        var extra = nextLayerHeight(p.layers, u.thickness, cfg);
         if (p.height + extra > cfg.stackH + EPS) continue;
         if (cfg.maxLoad > 0 && p.weight + u.weight > cfg.maxLoad + EPS) continue;
         target = p;
@@ -1555,7 +1566,7 @@
         target = { units: [], height: 0, weight: 0, layers: 0, partials: 0 };
         pallets.push(target);
       }
-      var add = u.thickness + (target.layers ? cfg.sheet : 0);
+      var add = nextLayerHeight(target.layers, u.thickness, cfg);
       target.units.push(u);
       target.height += add;
       target.weight += u.weight;
@@ -1588,7 +1599,7 @@
     function fits(bin, u) {
       if (bin.partials + (u.partial ? 1 : 0) > maxPartials) return false;
       if (cfg.maxLayers > 0 && bin.units.length >= cfg.maxLayers) return false;
-      var add = u.thickness + (bin.units.length ? cfg.sheet : 0);
+      var add = nextLayerHeight(bin.units.length, u.thickness, cfg);
       if (bin.height + add > cfg.stackH + EPS) return false;
       if (cfg.maxLoad > 0 && bin.weight + u.weight > cfg.maxLoad + EPS) return false;
       return true;
@@ -1610,7 +1621,7 @@
       for (var b = 0; b < K; b++) {
         if (!bins[b].units.length && b !== firstEmpty) continue;
         if (!fits(bins[b], u)) continue;
-        var add = u.thickness + (bins[b].units.length ? cfg.sheet : 0);
+        var add = nextLayerHeight(bins[b].units.length, u.thickness, cfg);
         candidates.push({ b: b, rem: cfg.stackH - (bins[b].height + add) });
       }
       candidates.sort(function (x, y) { return x.rem - y.rem; });
@@ -1622,7 +1633,7 @@
         if (seen[key]) continue;
         seen[key] = 1;
         var wasEmpty = bin.units.length === 0;
-        var add2 = u.thickness + (bin.units.length ? cfg.sheet : 0);
+        var add2 = nextLayerHeight(bin.units.length, u.thickness, cfg);
         bin.units.push(u);
         bin.height += add2;
         bin.weight += u.weight;
@@ -1735,7 +1746,7 @@
       // 尾箱优先塞进同规格整托的剩余高度/载重（例如 110 箱 / 54 箱一托 → 2 托）
       if (partial > 0 && fullPallets.length) {
         var last = fullPallets[fullPallets.length - 1];
-        var extraH = t + (last.layers ? cfg.sheet : 0);
+        var extraH = nextLayerHeight(last.layers, t, cfg);
         var canH = last.height + extraH <= cfg.stackH + EPS;
         var canW = !(cfg.maxLoad > 0) || (last.weight + partial * cfg.carton.weight <= cfg.maxLoad + EPS);
         var canL = cfg.maxLayers <= 0 || last.layers < cfg.maxLayers;
@@ -1833,11 +1844,12 @@
     }
     plan.flattened = Math.max(0, beforePartial - plan.partialTopCount);
     plan.partialTopCount = plan.partialTopCount || 0;
-    annotateStability(plan);
+    annotateStability(plan, cfgBase);
     return plan;
   }
 
-  function annotateStability(plan) {
+  function annotateStability(plan, cfg) {
+    cfg = cfg || {};
     var min = 1, low = 0, interlocked = 0, kinds = {};
     plan.pallets.forEach(function (p) {
       var s = palletSupport(p);
@@ -1859,7 +1871,12 @@
       var kindText = Object.keys(kinds).map(function (k) { return label[k] || k; }).join(' / ');
       parts.push('层间交错：' + interlocked + ' 托采用 ' + kindText);
     } else {
-      parts.push('层型镜像/旋转后没有有效差异，层间仍为对齐堆叠；建议加 3–5mm 层间垫板并配合缠绕膜/护角，或调整箱型/层型实现错缝。若加垫板后超高，需要增加托盘');
+      if (cfg.sheet > 0 && cfg.sheetEvery > 0) {
+        parts.push('层型镜像/旋转后没有有效差异，保持排列整齐；当前已设置每 ' + cfg.sheetEvery +
+          ' 层加 ' + cfg.sheet + 'mm 层板，并已计入总高');
+      } else {
+        parts.push('层型镜像/旋转后没有有效差异，保持排列整齐；建议加 3–5mm 层间垫板并配合缠绕膜/护角，或调整箱型/层型实现错缝。若加垫板后超高，需要增加托盘');
+      }
     }
     if (low) {
       parts.push('支撑检查：' + low + ' 托存在最低支撑率 < 85% 的层；建议加硬质层间垫板，或拆分为额外托盘' +
@@ -1933,7 +1950,7 @@
       withTop.forEach(function (hasTop) {
         var n = layers + hasTop;
         if (!n) return;
-        var h = height + (hasTop ? top.thickness : 0) + Math.max(0, n - 1) * cfg.sheet;
+        var h = height + (hasTop ? top.thickness : 0) + sheetCountFor(n, cfg) * cfg.sheet;
         var w = weight + (hasTop ? top.weight : 0);
         if (h > cfg.stackH + EPS) return;
         if (cfg.maxLoad > 0 && w > cfg.maxLoad + EPS) return;
@@ -2086,7 +2103,7 @@
 
     if (pallets.length >= base.totalPallets) {
       base.globalAttempted = true;
-      base.globalLowerBound = Math.ceil((totalHeight + Math.max(0, totalLayers - 1) * cfgBase.sheet) / cfgBase.stackH);
+      base.globalLowerBound = Math.ceil((totalHeight + sheetCountFor(totalLayers, cfgBase) * cfgBase.sheet) / cfgBase.stackH);
       return base;
     }
 
@@ -2094,7 +2111,7 @@
       ok: true, allowMix: true, allowSmallBottom: true,
       globalUsed: true, globalSaved: base.totalPallets - pallets.length,
       globalAttempted: true,
-      globalLowerBound: Math.ceil((totalHeight + Math.max(0, totalLayers - 1) * cfgBase.sheet) / cfgBase.stackH),
+      globalLowerBound: Math.ceil((totalHeight + sheetCountFor(totalLayers, cfgBase) * cfgBase.sheet) / cfgBase.stackH),
       skus: base.skus, fullPallets: [], tailPallets: [], mixedPallets: [],
       pallets: pallets, totalBoxes: base.totalBoxes, errors: base.errors,
       allowMixOn: true
@@ -2109,7 +2126,7 @@
         return (p.skuBreakdown[info.index] || 0) > 0;
       }).length;
     });
-    annotateStability(plan);
+    annotateStability(plan, cfgBase);
     return plan;
   }
 

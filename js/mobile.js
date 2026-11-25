@@ -4,7 +4,7 @@
   var Core = window.PalletCore;
   var XL = window.XlsxLite;
   var KEY = 'palletizer.v1';
-  var VERSION = '1.9.19';
+  var VERSION = '1.9.20';
   var PALETTE = ['#C99A5F', '#9FB3A6', '#C7A6A0', '#B1A3C9', '#D1B280', '#8FA9B8'];
 
   var DEFAULTS = {
@@ -13,7 +13,7 @@
       { name: '示例纸箱', l: 368, w: 236, h: 153, qty: 300, weight: 10 }
     ],
     opts: {
-      gap: 0, margin: 0, sheet: 0, overhang: 0, maxLoad: 1000, maxLayers: 0,
+      gap: 0, margin: 0, sheet: 0, sheetEvery: 2, overhang: 0, maxLoad: 1000, maxLayers: 0,
       allowSide: false, allowUprightLay: false,
       allowMix: true, allowSmallBottom: true, globalOptimize: false,
       useExactRules: true
@@ -61,7 +61,7 @@
         });
       }
       if (saved.opts) {
-        ['gap', 'margin', 'sheet', 'overhang', 'maxLoad', 'maxLayers'].forEach(function (k) {
+        ['gap', 'margin', 'sheet', 'sheetEvery', 'overhang', 'maxLoad', 'maxLayers'].forEach(function (k) {
           if (Number.isFinite(Number(saved.opts[k]))) s.opts[k] = Math.max(0, Number(saved.opts[k]));
         });
         ['allowSide', 'allowUprightLay', 'allowMix', 'allowSmallBottom', 'globalOptimize'].forEach(function (k) {
@@ -148,6 +148,7 @@
     state.opts.gap = numValue($('#optGap').value);
     state.opts.margin = numValue($('#optMargin').value);
     state.opts.sheet = numValue($('#optSheet').value);
+    state.opts.sheetEvery = Math.max(1, Math.floor(numValue($('#optSheetEvery').value)));
     state.opts.overhang = numValue($('#optOverhang').value);
     state.opts.maxLoad = numValue($('#optMaxLoad').value);
     state.opts.maxLayers = Math.floor(numValue($('#optMaxLayers').value));
@@ -159,6 +160,7 @@
     $('#optGap').value = fmt(state.opts.gap);
     $('#optMargin').value = fmt(state.opts.margin);
     $('#optSheet').value = fmt(state.opts.sheet);
+    $('#optSheetEvery').value = fmt(state.opts.sheetEvery);
     $('#optOverhang').value = fmt(state.opts.overhang);
     $('#optMaxLoad').value = fmt(state.opts.maxLoad);
     $('#optMaxLayers').value = fmt(state.opts.maxLayers);
@@ -282,6 +284,7 @@
         pallet: state.pallet,
         carton: c,
         gap: state.opts.gap, margin: state.opts.margin, sheet: state.opts.sheet,
+        sheetEvery: state.opts.sheetEvery,
         overhang: state.opts.overhang, maxLoad: state.opts.maxLoad, maxLayers: state.opts.maxLayers,
         allowFlat: true, allowSide: !!state.opts.allowSide,
         allowUprightLay: !!state.opts.allowUprightLay
@@ -655,7 +658,9 @@
           layer: li, rot: r.rot, color: color
         });
       });
-      z += u.thickness + (li < p.units.length - 1 ? state.opts.sheet : 0);
+      var board = li < p.units.length - 1 && state.opts.sheet > 0 &&
+        state.opts.sheetEvery > 0 && (li + 1) % state.opts.sheetEvery === 0;
+      z += u.thickness + (board ? state.opts.sheet : 0);
     });
     return {
       L: state.pallet.L, W: state.pallet.W,
@@ -1056,7 +1061,7 @@
       $('#' + id).addEventListener('change', readPalletInputs);
       $('#' + id).addEventListener('input', updateUsable);
     });
-    ['optGap', 'optMargin', 'optSheet', 'optOverhang', 'optMaxLoad', 'optMaxLayers'].forEach(function (id) {
+    ['optGap', 'optMargin', 'optSheet', 'optSheetEvery', 'optOverhang', 'optMaxLoad', 'optMaxLayers'].forEach(function (id) {
       $('#' + id).addEventListener('change', readAdvanced);
     });
     ['allowSide', 'allowUprightLay', 'allowMix', 'allowSmallBottom', 'globalOptimize', 'useExactRules'].forEach(function (id) {

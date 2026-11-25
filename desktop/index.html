@@ -113,11 +113,13 @@
             <label class="field"><span>箱间间隙</span><input id="optGap" type="number" min="0" step="0.1" value="0"></label>
             <label class="field"><span>边缘余量</span><input id="optMargin" type="number" min="0" step="0.1" value="0"></label>
             <label class="field"><span>层间垫板厚</span><input id="optSheet" type="number" min="0" step="0.1" value="0"></label>
+            <label class="field"><span>每几层加层板</span><input id="optSheetEvery" type="number" min="1" step="1" value="2"></label>
             <label class="field"><span>允许超出托盘</span><input id="optOverhang" type="number" min="0" step="0.1" value="0"></label>
             <label class="field"><span>最大载重 kg</span><input id="optMaxLoad" type="number" min="0" step="1" value="0"></label>
             <label class="field"><span>最多堆叠层数</span><input id="optMaxLayers" type="number" min="0" step="1" value="0"></label>
           </div>
-          <label class="check wide"><input id="allowSmallBottom" type="checkbox" checked><span>允许小 / 轻层垫底补空</span><em>仅当能减少托数</em></label>
+          <p class="hint">层板厚填 0 表示不垫板；填 3、间隔 2，表示每 2 层加一层 3mm 层板，层板厚度计入总高。</p>
+          <label class="check wide"><input id="allowSmallBottom" type="checkbox" checked><span>允许多个尾层同托补空</span><em>仅当能减少托数</em></label>
           <label class="check wide"><input id="globalOptimize" type="checkbox"><span>全局省托（整层跨规格补位）</span><em>会打散整托</em></label>
           <p class="hint">全局省托会先按规格整托，再把整层塞进其他托的剩余高度；托盘数最少，但整托可能不再单一规格。</p>
           <p class="hint">默认大 / 重在下、小 / 轻在上；打开后允许多个尾层同托，只有确实减少托数时才采用。</p>

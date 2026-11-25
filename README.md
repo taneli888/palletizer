@@ -3,7 +3,7 @@
 **托盘码放测算台**  
 A responsive pallet loading calculator for iPhone, iPad and desktop.
 
-**v1.9.19：托数相同时优先同规格尾托、不混托；只有混托能减少顶层不完整层、降低顶面高差或明显提高顶层覆盖时，才允许混托。4151/4150 示例为 4 托、0 混托、A 40 箱和 B 36 箱各自成托。**
+**v1.9.20：取消仅靠前后左右挪动的假压缝；层型不变时保持排列整齐并建议加层板；新增“每几层加一层板”和层板厚度，按间隔计入总高，超高自动减少层数。**
 
 > 目标部署地址：<https://taneli888.github.io/palletizer/>  
 > GitHub 仓库：<https://github.com/taneli888/palletizer>  
