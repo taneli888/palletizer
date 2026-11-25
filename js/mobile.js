@@ -4,15 +4,13 @@
   var Core = window.PalletCore;
   var XL = window.XlsxLite;
   var KEY = 'palletizer.v1';
-  var VERSION = '1.9.14';
+  var VERSION = '1.9.15';
   var PALETTE = ['#C99A5F', '#9FB3A6', '#C7A6A0', '#B1A3C9', '#D1B280', '#8FA9B8'];
 
   var DEFAULTS = {
-    pallet: { L: 1072, W: 1072, H: 1250, base: 150 },
+    pallet: { L: 1200, W: 800, H: 1100, base: 145 },
     cartons: [
-      { name: '91 4130', l: 250, w: 230, h: 222, qty: 390, weight: 7 },
-      { name: '91 4131', l: 395, w: 250, h: 265, qty: 135, weight: 10 },
-      { name: '91 4132', l: 457, w: 200, h: 160, qty: 110, weight: 18 }
+      { name: '示例纸箱', l: 368, w: 236, h: 153, qty: 300, weight: 10 }
     ],
     opts: {
       gap: 0, margin: 0, sheet: 0, overhang: 0, maxLoad: 1000, maxLayers: 0,

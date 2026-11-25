@@ -7,8 +7,8 @@
   var KEY = 'pallet-stacking-studio.v1';
 
   var DEFAULTS = {
-    pallet: { L: 120, W: 80, H: 115, base: 0 },
-    carton: { name: '示例纸箱', l: 28, w: 18, h: 10, qty: 500, weight: 0.15 },
+    pallet: { L: 1200, W: 800, H: 1100, base: 145 },
+    carton: { name: '示例纸箱', l: 368, w: 236, h: 153, qty: 300, weight: 10 },
     opts: {
       gap: 0, margin: 0, sheet: 0, overhang: 0, maxLoad: 0, maxLayers: 0,
       allowSide: false, allowUprightLay: false, allowSmallBottom: true, globalOptimize: false
@@ -1476,6 +1476,39 @@
     state.ui.tab = name;
   }
 
+  function addCarton() {
+    readForm();
+    if (skuIndex >= 0 && state.skus[skuIndex]) {
+      state.skus[skuIndex] = clone(state.carton);
+    }
+    if (!state.skus.length) {
+      // 当前单箱先登记为第 1 条，之后可以继续添加
+      state.skus = [clone(state.carton)];
+      skuIndex = 0;
+      state.carton = clone(state.skus[0]);
+      fillForm();
+      recompute();
+      setCalcState('已添加第 1 条纸箱；继续点“添加纸箱”添加下一条', true);
+      toast('已添加第 1 条纸箱');
+      return;
+    }
+    var used = {};
+    state.skus.forEach(function (s) { used[s.name] = true; });
+    var n = state.skus.length + 1;
+    var name = '新纸箱 ' + n;
+    while (used[name]) { n++; name = '新纸箱 ' + n; }
+    var c = clone(state.carton);
+    c.name = name;
+    c.qty = 0;
+    state.skus.push(c);
+    skuIndex = state.skus.length - 1;
+    state.carton = clone(c);
+    fillForm();
+    recompute();
+    setCalcState('已添加“' + name + '”，请填写它的尺寸和订单数量', true);
+    toast('已添加纸箱：' + name);
+  }
+
   function loadSku(i) {
     if (!state.skus[i]) return;
     readForm();
@@ -2117,6 +2150,7 @@
       if (!item) return;
       viewPallet(item.dataset.pallet);
     });
+    $('#btnAddCarton').addEventListener('click', addCarton);
     $('#skuList').addEventListener('click', function (e) {
       var item = e.target.closest('.sku-item');
       if (!item) return;

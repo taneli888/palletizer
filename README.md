@@ -3,7 +3,7 @@
 **托盘码放测算台**  
 A responsive pallet loading calculator for iPhone, iPad and desktop.
 
-**v1.9.14：PDF 俯视图的“实际长 / 实际宽”尺寸线移近托盘边缘，减少无必要的留白距离。**
+**v1.9.15：默认托盘 1200×800×1100 / 托盘高 145；默认纸箱 368×236×153；桌面版增加“添加纸箱”按钮；PDF 实际长宽尺寸线更贴近托盘。**
 
 > 目标部署地址：<https://taneli888.github.io/palletizer/>  
 > GitHub 仓库：<https://github.com/taneli888/palletizer>  

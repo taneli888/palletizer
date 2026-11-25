@@ -61,13 +61,13 @@
           <span class="tag">内净尺寸 · mm</span>
         </div>
         <div class="field-row three">
-          <label class="field"><span>长</span><input id="palletL" type="number" min="0" step="0.1" value="120"></label>
-          <label class="field"><span>宽</span><input id="palletW" type="number" min="0" step="0.1" value="80"></label>
-          <label class="field"><span>最大总高</span><input id="palletH" type="number" min="0" step="0.1" value="115"></label>
+          <label class="field"><span>长</span><input id="palletL" type="number" min="0" step="0.1" value="1200"></label>
+          <label class="field"><span>宽</span><input id="palletW" type="number" min="0" step="0.1" value="800"></label>
+          <label class="field"><span>最大总高</span><input id="palletH" type="number" min="0" step="0.1" value="1100"></label>
         </div>
         <div class="field-row two">
-          <label class="field"><span>托盘高度</span><input id="palletBase" type="number" min="0" step="0.1" value="0"></label>
-          <label class="field"><span>可用码放高</span><input id="palletUsable" type="text" readonly value="115"></label>
+          <label class="field"><span>托盘高度</span><input id="palletBase" type="number" min="0" step="0.1" value="145"></label>
+          <label class="field"><span>可用码放高</span><input id="palletUsable" type="text" readonly value="955"></label>
         </div>
         <p class="hint">最大总高包含托盘；可用码放高 = 最大总高 − 托盘高度。托盘高度填 0 时按旧口径处理。</p>
         <p class="hint">尺寸填完后点左下角“开始计算”（或按 Enter）；输入过程中不会触发计算。</p>
@@ -80,13 +80,13 @@
         </div>
         <label class="field block"><span>名称 / 型号</span><input id="cartonName" type="text" value="示例纸箱" maxlength="40"></label>
         <div class="field-row three">
-          <label class="field"><span>长</span><input id="cartonL" type="number" min="0" step="0.1" value="28"></label>
-          <label class="field"><span>宽</span><input id="cartonW" type="number" min="0" step="0.1" value="18"></label>
-          <label class="field"><span>高</span><input id="cartonH" type="number" min="0" step="0.1" value="10"></label>
+          <label class="field"><span>长</span><input id="cartonL" type="number" min="0" step="0.1" value="368"></label>
+          <label class="field"><span>宽</span><input id="cartonW" type="number" min="0" step="0.1" value="236"></label>
+          <label class="field"><span>高</span><input id="cartonH" type="number" min="0" step="0.1" value="153"></label>
         </div>
         <div class="field-row two">
-          <label class="field"><span>订单数量</span><input id="cartonQty" type="number" min="0" step="1" value="500"></label>
-          <label class="field"><span>单箱重量 kg</span><input id="cartonWeight" type="number" min="0" step="0.01" value="0.15"></label>
+          <label class="field"><span>订单数量</span><input id="cartonQty" type="number" min="0" step="1" value="300"></label>
+          <label class="field"><span>单箱重量 kg</span><input id="cartonWeight" type="number" min="0" step="0.01" value="10"></label>
         </div>
         <div class="lock-note">
           <svg viewBox="0 0 14 14" width="12" height="12" aria-hidden="true"><rect x="2.5" y="6" width="9" height="6" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M4.5 6V4.4a2.5 2.5 0 0 1 5 0V6" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>
@@ -99,6 +99,7 @@
             <label class="check"><input id="allowUprightLay" type="checkbox"><span>竖放</span><em>长作高</em></label>
           </div>
         </div>
+        <button class="btn ghost add-carton" id="btnAddCarton" type="button">＋ 添加纸箱</button>
       </section>
 
       <section class="card advanced">
