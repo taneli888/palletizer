@@ -1764,6 +1764,17 @@
         chosen = looseMixed;
         plan.smallBottomUsed = true;
       }
+      // 如果按规格分组后托数不增加，优先保留同规格尾托，减少无意义的混托和顶层高低差。
+      var bySku = {}, grouped = [];
+      tailUnits.forEach(function (u) {
+        var k = u.skuIndex;
+        if (!bySku[k]) bySku[k] = [];
+        bySku[k].push(u);
+      });
+      Object.keys(bySku).forEach(function (k) {
+        grouped = grouped.concat(packUnits(bySku[k], cfgBase, { maxPartials: 1 }));
+      });
+      if (grouped.length <= chosen.length) chosen = grouped;
       chosen.forEach(function (p) {
         if (p.type === 'mixed') plan.mixedPallets.push(p);
         else {
@@ -1817,6 +1828,10 @@
         '。若加垫板后超高，需要增加托盘。');
     } else {
       parts.push('支撑检查：最低 ' + Math.round(min * 100) + '%（≥85%）');
+    }
+    if (plan.partialTopCount > 0) {
+      parts.push('顶部平整：仍有 ' + plan.partialTopCount +
+        ' 托为不完整顶层；不增加托盘时建议加硬质顶板/垫板找平，若要求每托满层则需调整尾箱分配或增加托盘');
     }
     plan.stabilityAdvice = parts.join('；');
     return plan;

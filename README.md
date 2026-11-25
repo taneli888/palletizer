@@ -3,7 +3,7 @@
 **托盘码放测算台**  
 A responsive pallet loading calculator for iPhone, iPad and desktop.
 
-**v1.9.17：整托层间加入镜像/旋转/错位交错层；保持托数不变；新增每层支撑率检查（最低 85%）和垫板/分托建议；默认参数和纸箱增删保留。**
+**v1.9.18：尾托优先按规格分组；相同托数时不再无意义混托；4151/4150 示例优化为 4 托、0 混托；新增顶层不完整提示和垫板建议。**
 
 > 目标部署地址：<https://taneli888.github.io/palletizer/>  
 > GitHub 仓库：<https://github.com/taneli888/palletizer>  
