@@ -1645,6 +1645,29 @@
    * @param {Array} cfgs 每个纸箱规格一份已归一化配置（含 qty）
    * @param {object} options {allowMix:boolean}
    */
+  function topFlatnessScore(pallets, cfg) {
+    var partial = 0, spread = 0, coverage = 0;
+    var area = Math.max(1, (cfg.pallet.L + 2 * cfg.overhang - 2 * cfg.margin) *
+      (cfg.pallet.W + 2 * cfg.overhang - 2 * cfg.margin));
+    pallets.forEach(function (p) {
+      var u = p.units[p.units.length - 1];
+      if (!u) return;
+      if (u.partial) partial++;
+      var hs = u.rects.map(function (r) { return r.thickness || u.thickness; });
+      if (hs.length) spread += Math.max.apply(null, hs) - Math.min.apply(null, hs);
+      var topArea = u.rects.reduce(function (s, r) { return s + r.w * r.h; }, 0);
+      coverage += topArea / area;
+    });
+    return [partial, spread, -coverage];
+  }
+
+  function flatnessBetter(a, b) {
+    for (var i = 0; i < Math.max(a.length, b.length); i++) {
+      if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) < (b[i] || 0);
+    }
+    return false;
+  }
+
   function buildPlan(cfgs, options) {
     options = options || {};
     var allowMix = !!options.allowMix;
@@ -1774,7 +1797,23 @@
       Object.keys(bySku).forEach(function (k) {
         grouped = grouped.concat(packUnits(bySku[k], cfgBase, { maxPartials: 1 }));
       });
-      if (grouped.length <= chosen.length) chosen = grouped;
+      if (grouped.length < chosen.length) {
+        chosen = grouped;
+      } else if (grouped.length === chosen.length) {
+        // 托数相同：默认不混托；只有混托确实改善顶层平整度时才保留混托。
+        var groupedFlat = topFlatnessScore(grouped, cfgBase);
+        var mixedFlat = topFlatnessScore(chosen, cfgBase);
+        var keepGrouped;
+        if (groupedFlat[0] !== mixedFlat[0]) {
+          keepGrouped = groupedFlat[0] < mixedFlat[0];
+        } else if (groupedFlat[1] !== mixedFlat[1]) {
+          keepGrouped = groupedFlat[1] < mixedFlat[1];
+        } else {
+          // 高差相同，只有混托明显增加顶层覆盖时才允许混托
+          keepGrouped = groupedFlat[2] >= mixedFlat[2];
+        }
+        if (keepGrouped) chosen = grouped;
+      }
       chosen.forEach(function (p) {
         if (p.type === 'mixed') plan.mixedPallets.push(p);
         else {
