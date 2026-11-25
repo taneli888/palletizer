@@ -3,7 +3,7 @@
 **托盘码放测算台**  
 A responsive pallet loading calculator for iPhone, iPad and desktop.
 
-**v1.9.20：取消仅靠前后左右挪动的假压缝；层型不变时保持排列整齐并建议加层板；新增“每几层加一层板”和层板厚度，按间隔计入总高，超高自动减少层数。**
+**v1.9.21：桌面版默认字体整体放大 12%，按钮、表单、KPI、说明、清单和 3D 标签统一调整，保持三栏布局。**
 
 > 目标部署地址：<https://taneli888.github.io/palletizer/>  
 > GitHub 仓库：<https://github.com/taneli888/palletizer>  

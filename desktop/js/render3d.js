@@ -200,7 +200,7 @@
 
     if (!m) {
       ctx.fillStyle = 'rgba(255,255,255,.45)';
-      ctx.font = '13px "Segoe UI","Microsoft YaHei",sans-serif';
+      ctx.font = '14px "Segoe UI","Microsoft YaHei",sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText('输入尺寸后显示 3D 码放示意', w / 2, h / 2);
       return;
@@ -482,9 +482,9 @@
       if (!p) continue;
       var text = String(label.text || '');
       if (text.length > 30) text = text.slice(0, 29) + '…';
-      ctx.font = '600 11px "Segoe UI","Microsoft YaHei",sans-serif';
+      ctx.font = '600 12px "Segoe UI","Microsoft YaHei",sans-serif';
       var tw = ctx.measureText(text).width;
-      var bw = tw + 28, bh = 22;
+      var bw = tw + 30, bh = 24;
       var x = p.x + 36;
       var y = p.y - 38 - i * 27;
       if (x + bw > this._w - 12) x = p.x - bw - 36;
@@ -575,9 +575,9 @@
     }
 
     function pill(text, x, y) {
-      ctx.font = '600 11.5px "Segoe UI","Microsoft YaHei",sans-serif';
+      ctx.font = '600 12.5px "Segoe UI","Microsoft YaHei",sans-serif';
       var tw = ctx.measureText(text).width;
-      var bw = tw + 16, bh = 21;
+      var bw = tw + 18, bh = 23;
       ctx.fillStyle = 'rgba(9,14,19,.82)';
       ctx.strokeStyle = 'rgba(235,178,104,.45)';
       ctx.lineWidth = 1;
