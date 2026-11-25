@@ -1318,7 +1318,8 @@
         '<div><strong>' + esc(sku.name) + '</strong><div class="meta">' + dims + ' mm · 订单 ' +
         fmt(sku.qty) + ' 箱 · 单托 ' + (sol && sol.ok ? sol.total : '—') + '</div></div>' +
         '<div class="nums"><b>' + (plan && plan.globalUsed ? (info ? info.palletCount : '—') : (info && info.ok ? info.fullPallets : '—')) +
-        '</b><span>' + (plan && plan.globalUsed ? '参与托' : '整托' + (tail > 0 ? ' · 尾' + tail : '')) + '</span></div></div>';
+        '</b><span>' + (plan && plan.globalUsed ? '参与托' : '整托' + (tail > 0 ? ' · 尾' + tail : '')) + '</span></div>' +
+        '<button class="sku-del" type="button" data-del="' + i + '" title="删除纸箱">×</button></div>';
     }).join('');
     wrap.innerHTML = html;
   }
@@ -1507,6 +1508,33 @@
     recompute();
     setCalcState('已添加“' + name + '”，请填写它的尺寸和订单数量', true);
     toast('已添加纸箱：' + name);
+  }
+
+  function deleteCarton(index) {
+    if (!state.skus[index]) return;
+    if (state.skus.length <= 1) {
+      toast('至少保留一个纸箱；可以修改它，或先添加另一个再删除');
+      return;
+    }
+    var name = state.skus[index].name;
+    if (!window.confirm('删除纸箱“' + name + '”？')) return;
+    readForm();
+    if (skuIndex >= 0 && state.skus[skuIndex]) state.skus[skuIndex] = clone(state.carton);
+    state.skus.splice(index, 1);
+    if (skuIndex === index) {
+      skuIndex = Math.min(index, state.skus.length - 1);
+    } else if (index < skuIndex) {
+      skuIndex--;
+    }
+    if (skuIndex >= state.skus.length) skuIndex = state.skus.length - 1;
+    if (skuIndex < 0) skuIndex = 0;
+    state.carton = clone(state.skus[skuIndex]);
+    state.palletView = null;
+    fillForm();
+    recompute();
+    scheduleSave();
+    setCalcState('已删除纸箱：' + name, true);
+    toast('已删除纸箱：' + name);
   }
 
   function loadSku(i) {
@@ -2152,6 +2180,13 @@
     });
     $('#btnAddCarton').addEventListener('click', addCarton);
     $('#skuList').addEventListener('click', function (e) {
+      var del = e.target.closest('[data-del]');
+      if (del) {
+        e.preventDefault();
+        e.stopPropagation();
+        deleteCarton(Number(del.dataset.del));
+        return;
+      }
       var item = e.target.closest('.sku-item');
       if (!item) return;
       loadSku(Number(item.dataset.sku));
