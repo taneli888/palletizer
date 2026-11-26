@@ -1712,6 +1712,12 @@
     return min;
   }
 
+  function tailMaxHeight(pallets) {
+    var h = 0;
+    pallets.forEach(function (p) { h = Math.max(h, p.height || 0); });
+    return h;
+  }
+
   function packTailCandidates(units, cfgBase, options) {
     if (!units || !units.length) {
       return { chosen: [], potentialSaving: 0, smallBottomUsed: false };
@@ -1982,9 +1988,14 @@
       var chosen = packed.chosen;
       if (hasSplitStack) {
         var altPacked = packTailCandidates(altTailUnits, cfgBase, options);
+        applyParallelStacks(altPacked.chosen, cfgBase);
+        var altSup = tailSupportMin(altPacked.chosen);
+        var stdSup = tailSupportMin(chosen);
+        var altHeight = tailMaxHeight(altPacked.chosen);
+        var stdHeight = tailMaxHeight(chosen);
         if (altPacked.chosen.length < chosen.length ||
             (altPacked.chosen.length === chosen.length &&
-             tailSupportMin(altPacked.chosen) >= tailSupportMin(chosen) - EPS)) {
+             altSup >= stdSup - EPS && altHeight <= stdHeight + EPS)) {
           chosen = altPacked.chosen;
           plan.potentialSaving = altPacked.potentialSaving;
           plan.smallBottomUsed = altPacked.smallBottomUsed;

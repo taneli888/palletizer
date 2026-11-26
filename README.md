@@ -3,7 +3,7 @@
 **托盘码放测算台**  
 A responsive pallet loading calculator for iPhone, iPad and desktop.
 
-**v1.9.27：尾层拆分不再要求二等分；尾箱超过半层时按 ceil/floor 拆成两层（如 19→10+9），统一排成紧凑 2×5 块，另一规格尾箱排成一列，优先减少悬空。**
+**v1.9.28：尾托方案在托数、支撑率相同的情况下优先选择总高度更低的方案；159 箱尾层按 10+9 紧凑排布，P3 高度 680mm。**
 
 > 目标部署地址：<https://taneli888.github.io/palletizer/>  
 > GitHub 仓库：<https://github.com/taneli888/palletizer>  
