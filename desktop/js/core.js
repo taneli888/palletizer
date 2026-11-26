@@ -1927,8 +1927,8 @@
       info.tailLayers = left + (partial > 0 ? 1 : 0);
 
       var tail = [];
-      var splitTarget = !options.noSplit && left === 1 && partial === 0 && qty === perLayer && perLayer % 2 === 0;
-      var tailUnit = splitTarget ? Object.assign({}, baseUnit, { splitTarget: true }) : baseUnit;
+      var splitTarget = !options.noSplit && left === 1 && partial === 0 && perLayer % 2 === 0;
+      var tailUnit = baseUnit;
       for (var l = 0; l < left; l++) tail.push(tailUnit);
       if (partial > 0) tail.push(makeLayerUnit(cfg, sol, si, partial, true));
 
@@ -1938,13 +1938,16 @@
           if (splitTarget) {
             hasSplitStack = true;
             var halfCount = perLayer / 2;
-            var halfA = makeLayerUnit(cfg, sol, si, halfCount, true);
-            var halfB = makeLayerUnit(cfg, sol, si, halfCount, true);
-            halfA.substack = true;
-            halfB.substack = true;
-            halfA.stackGroup = si;
-            halfB.stackGroup = si;
-            altTailUnits.push(halfA, halfB);
+            for (var hl = 0; hl < left; hl++) {
+              var halfA = makeLayerUnit(cfg, sol, si, halfCount, true);
+              var halfB = makeLayerUnit(cfg, sol, si, halfCount, true);
+              halfA.substack = true;
+              halfB.substack = true;
+              halfA.stackGroup = si;
+              halfB.stackGroup = si;
+              altTailUnits.push(halfA, halfB);
+            }
+            if (partial > 0) altTailUnits.push(makeLayerUnit(cfg, sol, si, partial, true));
           } else {
             tail.forEach(function (u) { altTailUnits.push(u); });
           }
