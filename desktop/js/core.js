@@ -992,10 +992,19 @@
     return { min: min, avg: areaSum ? sum / areaSum : 1 };
   }
 
-  function palletSupport(p) {
+  function palletSupport(p, cfg) {
+    var zz = unitZPositions(p, cfg || {});
     var min = 1, sum = 0, layers = 0, low = [];
-    for (var i = 1; i < p.units.length; i++) {
-      var s = supportRatio(p.units[i].rects, p.units[i - 1].rects);
+    for (var i = 0; i < p.units.length; i++) {
+      var z0 = zz[i];
+      if (!(z0 > EPS)) continue;
+      var below = [];
+      for (var j = 0; j < p.units.length; j++) {
+        if (j === i) continue;
+        var top = zz[j] + p.units[j].thickness;
+        if (top <= z0 + EPS) below = below.concat(p.units[j].rects);
+      }
+      var s = supportRatio(p.units[i].rects, below);
       min = Math.min(min, s.min);
       sum += s.avg;
       layers++;
@@ -1065,12 +1074,24 @@
     return { base: base, alt: null, kind: '' };
   }
 
+  function unitZPositions(p, cfg) {
+    var z = 0, out = [];
+    p.units.forEach(function (u, i) {
+      var z0 = u.z0 != null ? u.z0 : z;
+      out.push(z0);
+      var board = i > 0 && cfg.sheet > 0 && cfg.sheetEvery > 0 && i % cfg.sheetEvery === 0;
+      z = Math.max(z, z0 + u.thickness) + (board ? cfg.sheet : 0);
+    });
+    return out;
+  }
+
   function refreshPallet(p, cfg) {
     var height = 0, weight = 0, boxes = 0, bySku = {};
     var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    var zz = unitZPositions(p, cfg);
     for (var i = 0; i < p.units.length; i++) {
       var u = p.units[i];
-      height += u.thickness + (i > 0 && cfg.sheet > 0 && cfg.sheetEvery > 0 && i % cfg.sheetEvery === 0 ? cfg.sheet : 0);
+      height = Math.max(height, zz[i] + u.thickness);
       weight += u.weight;
       boxes += u.count;
       if (u.parts) {
@@ -1735,8 +1756,52 @@
     };
   }
 
-  function buildPlan(cfgs, options) {
-    options = options || {};
+  function applyParallelStacks(pallets, cfg) {
+    function overlaps(a, b) {
+      return Math.min(a.wx + a.w, b.wx + b.w) - Math.max(a.wx, b.wx) > EPS &&
+        Math.min(a.wy + a.h, b.wy + b.h) - Math.max(a.wy, b.wy) > EPS;
+    }
+    pallets.forEach(function (p) {
+      var subs = p.units.filter(function (u) { return u.substack; });
+      if (!subs.length) return;
+      var full = p.units.filter(function (u) { return !u.partial; });
+      var z = 0;
+      full.forEach(function (u) {
+        var z0 = u.z0 != null ? u.z0 : z;
+        z = Math.max(z, z0 + u.thickness);
+      });
+      var baseZ = z;
+      subs.forEach(function (u, i) { u.z0 = baseZ + i * u.thickness; });
+      var normals = p.units.filter(function (u) { return u.partial && !u.substack; });
+      normals.forEach(function (u) {
+        u.z0 = baseZ;
+        u.rects = u.rects.map(function (r) { return Object.assign({}, r); });
+      });
+      // 同一高度上还有普通尾箱时，把它放到整层未被局部叠层占用的位置，避免压在同一块区域。
+      var occupied = [];
+      subs.forEach(function (u) { occupied = occupied.concat(u.rects); });
+      normals.forEach(function (u) {
+        if (!full.length || !u.rects.length) return;
+        var candidates = [];
+        full[0].rects.forEach(function (fr) {
+          var hit = occupied.some(function (o) { return overlaps(fr, o); });
+          if (!hit && !candidates.some(function (c) {
+            return Math.abs(c.wx - fr.wx) < EPS && Math.abs(c.wy - fr.wy) < EPS;
+          })) candidates.push(fr);
+        });
+        if (candidates.length < u.rects.length) return;
+        u.rects.forEach(function (r, i) {
+          var fr = candidates[i];
+          r.x = fr.x; r.y = fr.y; r.wx = fr.wx; r.wy = fr.wy; r.w = fr.w; r.h = fr.h;
+        });
+        occupied = occupied.concat(u.rects);
+      });
+      p.parallel = true;
+      refreshPallet(p, cfg);
+    });
+  }
+
+  function buildPlan(cfgs, options) {    options = options || {};
     var allowMix = !!options.allowMix;
     var plan = {
       ok: true, allowMix: allowMix,
@@ -1885,6 +1950,7 @@
     }
 
     plan.pallets = plan.fullPallets.concat(plan.tailPallets, plan.mixedPallets);
+    if (plan.splitStacked) applyParallelStacks(plan.pallets, cfgBase);
     finalizePalletPlan(plan, cfgBase);
     var beforePartial = plan.partialTopCount;
     var flat = flattenTops(plan.pallets, cfgBase, allowMix, !!options.allowSmallBottom);
@@ -1902,7 +1968,7 @@
     cfg = cfg || {};
     var min = 1, low = 0, interlocked = 0, kinds = {};
     plan.pallets.forEach(function (p) {
-      var s = palletSupport(p);
+      var s = palletSupport(p, cfg);
       p.support = s;
       min = Math.min(min, s.min);
       if (s.lowLayers.length) low++;

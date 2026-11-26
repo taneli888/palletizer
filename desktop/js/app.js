@@ -808,13 +808,14 @@
     var boxes = [], tops = {}, z = 0;
     var mixed = p.type === 'mixed';
     p.units.forEach(function (u, li) {
-      var zTop = z + u.thickness;
+      var zBottom = u.z0 != null ? u.z0 : z;
+      var zTop = zBottom + u.thickness;
       u.rects.forEach(function (r) {
         var si = r.skuIndex != null ? r.skuIndex : u.skuIndex;
         var thick = r.thickness || u.thickness;
         var color = (mixed && si >= 0) ? PALETTE[si % PALETTE.length] : null;
         boxes.push({
-          x: r.wx, y: r.wy, z: z,
+          x: r.wx, y: r.wy, z: zBottom,
           w: r.w, d: r.h, h: thick,
           layer: li, rot: r.rot, color: color, skuIndex: si
         });
@@ -825,13 +826,13 @@
             layer: li,
             skuIndex: si,
             w: r.w, h: r.h, thickness: thick,
-            anchor: { x: r.wx + r.w / 2, y: r.wy + r.h / 2, z: z + thick }
+            anchor: { x: r.wx + r.w / 2, y: r.wy + r.h / 2, z: zBottom + thick }
           };
         }
       });
       var board = li < p.units.length - 1 && state.opts.sheet > 0 &&
         state.opts.sheetEvery > 0 && (li + 1) % state.opts.sheetEvery === 0;
-      z = zTop + (board ? state.opts.sheet : 0);
+      z = Math.max(z, zTop) + (board ? state.opts.sheet : 0);
     });
     var labels = Object.keys(tops).map(function (key) {
       var t = tops[key];
@@ -1967,7 +1968,8 @@
       var pv = state.palletView;
       var acc = 0;
       pv.units.forEach(function (u, i) {
-        acc += u.thickness;
+        var z0 = u.z0 != null ? u.z0 : acc;
+        acc = Math.max(acc, z0 + u.thickness);
         if (i > 0 && state.opts.sheet > 0 && state.opts.sheetEvery > 0 && i % state.opts.sheetEvery === 0) {
           acc += state.opts.sheet;
         }

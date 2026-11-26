@@ -3,7 +3,7 @@
 **托盘码放测算台**  
 A responsive pallet loading calculator for iPhone, iPad and desktop.
 
-**v1.9.22：计算后 3D 默认显示第一托；单规格正好整层且可拆分时，可拆成两层相同局部层叠放（如 410×130 的 20 箱变为 10+10 两层），不再强制一整层铺满。**
+**v1.9.23：局部叠层改为并排独立堆叠；410×130 的 10+10 两层可并排放在 4 箱 220×220 旁边，不再把 220 尾箱压到 410 顶面；3D 和高度计算支持不同层起始高度。**
 
 > 目标部署地址：<https://taneli888.github.io/palletizer/>  
 > GitHub 仓库：<https://github.com/taneli888/palletizer>  
