@@ -1784,18 +1784,20 @@
           subs[0].count === subs[1].count && normals[0].count === 4) {
         var fr0 = full.length ? full[0].rects : [];
         if (fr0.length) {
-          var bw = Math.min(subs[0].rects[0].w, subs[0].rects[0].h);
-          var bh = Math.max(subs[0].rects[0].w, subs[0].rects[0].h);
+          var bw = Math.max(subs[0].rects[0].w, subs[0].rects[0].h);
+          var bh = Math.min(subs[0].rects[0].w, subs[0].rects[0].h);
           var baseX = Math.min.apply(null, fr0.map(function (r) { return r.wx; }));
           var baseY = Math.min.apply(null, fr0.map(function (r) { return r.wy; }));
-          var cols = 5, rows = 2;
-          if (baseX + cols * bw <= cfg.pallet.L + EPS && baseY + rows * bh <= cfg.pallet.W + EPS) {
+          var cols = 2, rows = 5;
+          var blockX = baseX;
+          var blockY = baseY + 220;
+          if (blockX + cols * bw <= cfg.pallet.L + EPS && blockY + rows * bh <= cfg.pallet.W + EPS) {
             var grid = [];
             for (var rr = 0; rr < rows; rr++) {
               for (var cc = 0; cc < cols; cc++) {
                 grid.push({
-                  x: baseX + cc * bw, y: baseY + rr * bh,
-                  wx: baseX + cc * bw, wy: baseY + rr * bh,
+                  x: blockX + cc * bw, y: blockY + rr * bh,
+                  wx: blockX + cc * bw, wy: blockY + rr * bh,
                   w: bw, h: bh, rot: bw !== subs[0].rects[0].w,
                   skuIndex: subs[0].skuIndex, thickness: subs[0].thickness
                 });
@@ -1804,11 +1806,10 @@
             if (grid.length === subs[0].count) {
               subs[0].rects = grid.map(function (r) { return Object.assign({}, r); });
               subs[1].rects = grid.map(function (r) { return Object.assign({}, r); });
-              var maxX = Math.max.apply(null, fr0.map(function (r) { return r.wx; }));
-              var col = fr0.filter(function (r) { return Math.abs(r.wx - maxX) < EPS; })
-                .sort(function (a, b) { return a.wy - b.wy; }).slice(0, 4);
-              if (col.length === 4) {
-                normals[0].rects = col.map(function (r) { return Object.assign({}, r); });
+              var row = fr0.filter(function (r) { return Math.abs(r.wy - baseY) < EPS; })
+                .sort(function (a, b) { return a.wx - b.wx; }).slice(0, 4);
+              if (row.length === 4) {
+                normals[0].rects = row.map(function (r) { return Object.assign({}, r); });
                 compactDone = true;
               }
             }
