@@ -470,6 +470,8 @@
       plan = Core.buildGlobalPlan(planCfgs, plan);
     }
     if (exactUsed && state.opts.globalOptimize) toast('已使用精确布局规则，本次跳过全局省托');
+    // 计算后默认展示整张计划的第一个托盘，而不是第一个规格的整垛总量。
+    state.palletView = plan && plan.pallets && plan.pallets.length ? plan.pallets[0] : null;
 
     if (!opts.skipAnalysis) ensureAnalysis(cfg);
     updateDeltaUI();
@@ -1213,6 +1215,10 @@
       summary.insertAdjacentHTML('beforeend',
         '<div class="plan-note' + (plan.lowSupportPallets ? ' warn' : '') + '">' +
         esc(plan.stabilityAdvice) + '</div>');
+    }
+    if (plan.splitStacked) {
+      summary.insertAdjacentHTML('beforeend',
+        '<div class="plan-note">局部叠层：已把同一规格的整层拆成相同局部层叠放，避免强行铺满整托。</div>');
     }
 
     skuEl.innerHTML = plan.skus.map(function (info, i) {
@@ -2066,6 +2072,7 @@
       (plan ? plan.fullCount : '—') + ' · 混托 ' + (plan ? plan.mixedCount : '—') + '）</b></div>' +
       '</div></div>' +
       (plan && plan.stabilityAdvice ? '<p class="sub">' + esc(plan.stabilityAdvice) + '</p>' : '') +
+      (plan && plan.splitStacked ? '<p class="sub">局部叠层：同一规格按相同局部层叠放，未强行铺满整层。</p>' : '') +
       orientTable +
       (planRows ? '<h2>托盘计划（共 ' + plan.totalPallets + ' 托）</h2>' +
         '<table><thead><tr><th>托盘号</th><th>类型</th><th>规格明细</th><th>箱数</th><th>层数</th><th>实际长×宽×高 / 含托盘</th><th>重量kg</th></tr></thead><tbody>' +

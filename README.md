@@ -3,7 +3,7 @@
 **托盘码放测算台**  
 A responsive pallet loading calculator for iPhone, iPad and desktop.
 
-**v1.9.21：桌面版默认字体整体放大 12%，按钮、表单、KPI、说明、清单和 3D 标签统一调整，保持三栏布局。**
+**v1.9.22：计算后 3D 默认显示第一托；单规格正好整层且可拆分时，可拆成两层相同局部层叠放（如 410×130 的 20 箱变为 10+10 两层），不再强制一整层铺满。**
 
 > 目标部署地址：<https://taneli888.github.io/palletizer/>  
 > GitHub 仓库：<https://github.com/taneli888/palletizer>  

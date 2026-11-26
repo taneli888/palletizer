@@ -1281,6 +1281,7 @@
   }
 
   function mergePartialLayers(p, cfg) {
+    if (p.units.some(function (u) { return u.substack; })) return p;
     var partials = p.units.filter(function (u) { return u.partial; });
     if (partials.length < 2) return p;
 
@@ -1448,7 +1449,9 @@
     var guard = 0;
 
     while (guard++ < 40) {
-      var partials = list.filter(function (p) { return topPartialInfo(p); });
+      var partials = list.filter(function (p) {
+        return topPartialInfo(p) && !p.units.some(function (u) { return u.substack; });
+      });
       if (partials.length < 2) break;
       partials.sort(function (a, b) {
         return topPartialInfo(b).unit.count - topPartialInfo(a).unit.count;
@@ -1554,7 +1557,7 @@
       var target = null;
       for (var i = 0; i < pallets.length; i++) {
         var p = pallets[i];
-        if (p.partials + (u.partial ? 1 : 0) > maxPartials) continue;
+        if (p.partials + (u.partial && !u.substack ? 1 : 0) > maxPartials) continue;
         if (cfg.maxLayers > 0 && p.layers >= cfg.maxLayers) continue;
         var extra = nextLayerHeight(p.layers, u.thickness, cfg);
         if (p.height + extra > cfg.stackH + EPS) continue;
@@ -1571,7 +1574,7 @@
       target.height += add;
       target.weight += u.weight;
       target.layers += 1;
-      target.partials += u.partial ? 1 : 0;
+      target.partials += u.partial && !u.substack ? 1 : 0;
     });
     return pallets.map(function (p) {
       var set = {};
@@ -1597,7 +1600,7 @@
     var nodes = 0, t0 = Date.now(), aborted = false;
 
     function fits(bin, u) {
-      if (bin.partials + (u.partial ? 1 : 0) > maxPartials) return false;
+      if (bin.partials + (u.partial && !u.substack ? 1 : 0) > maxPartials) return false;
       if (cfg.maxLayers > 0 && bin.units.length >= cfg.maxLayers) return false;
       var add = nextLayerHeight(bin.units.length, u.thickness, cfg);
       if (bin.height + add > cfg.stackH + EPS) return false;
@@ -1637,12 +1640,12 @@
         bin.units.push(u);
         bin.height += add2;
         bin.weight += u.weight;
-        bin.partials += u.partial ? 1 : 0;
+        bin.partials += u.partial && !u.substack ? 1 : 0;
         if (dfs(idx + 1)) return true;
         bin.units.pop();
         bin.height -= add2;
         bin.weight -= u.weight;
-        bin.partials -= u.partial ? 1 : 0;
+        bin.partials -= u.partial && !u.substack ? 1 : 0;
         if (wasEmpty) break;
       }
       return false;
@@ -1679,6 +1682,59 @@
     return false;
   }
 
+  function tailSupportMin(pallets) {
+    var min = 1;
+    pallets.forEach(function (p) {
+      var s = palletSupport(p);
+      if (s.min < min) min = s.min;
+    });
+    return min;
+  }
+
+  function packTailCandidates(units, cfgBase, options) {
+    if (!units || !units.length) {
+      return { chosen: [], potentialSaving: 0, smallBottomUsed: false };
+    }
+    var strictMixed = packUnits(units, cfgBase, { maxPartials: 1 });
+    var looseMixed = packUnits(units, cfgBase, { maxPartials: 99 });
+    var saving = strictMixed.length - looseMixed.length;
+    var chosen = strictMixed;
+    var smallBottomUsed = false;
+    if (options.allowSmallBottom && saving > 0) {
+      chosen = looseMixed;
+      smallBottomUsed = true;
+    }
+    var bySku = {}, grouped = [];
+    units.forEach(function (u) {
+      var k = u.skuIndex;
+      if (!bySku[k]) bySku[k] = [];
+      bySku[k].push(u);
+    });
+    Object.keys(bySku).forEach(function (k) {
+      grouped = grouped.concat(packUnits(bySku[k], cfgBase, { maxPartials: 1 }));
+    });
+    if (grouped.length < chosen.length) {
+      chosen = grouped;
+    } else if (grouped.length === chosen.length) {
+      var groupedFlat = topFlatnessScore(grouped, cfgBase);
+      var mixedFlat = topFlatnessScore(chosen, cfgBase);
+      var keepGrouped;
+      if (groupedFlat[0] !== mixedFlat[0]) {
+        keepGrouped = groupedFlat[0] < mixedFlat[0];
+      } else if (groupedFlat[1] !== mixedFlat[1]) {
+        keepGrouped = groupedFlat[1] < mixedFlat[1];
+      } else {
+        keepGrouped = groupedFlat[2] >= mixedFlat[2];
+      }
+      if (keepGrouped) chosen = grouped;
+    }
+    return {
+      chosen: chosen,
+      potentialSaving: Math.max(0, saving),
+      smallBottomUsed: smallBottomUsed
+    };
+  }
+
   function buildPlan(cfgs, options) {
     options = options || {};
     var allowMix = !!options.allowMix;
@@ -1693,6 +1749,8 @@
     if (!cfgs || !cfgs.length) return plan;
     var cfgBase = cfgs[0];
     var tailUnits = [];
+    var altTailUnits = [];
+    var hasSplitStack = false;
 
     cfgs.forEach(function (cfg, si) {
       var qty = cfg.carton.qty;
@@ -1763,12 +1821,27 @@
       info.tailLayers = left + (partial > 0 ? 1 : 0);
 
       var tail = [];
-      for (var l = 0; l < left; l++) tail.push(baseUnit);
+      var splitTarget = !options.noSplit && left === 1 && partial === 0 && qty === perLayer && perLayer % 2 === 0;
+      var tailUnit = splitTarget ? Object.assign({}, baseUnit, { splitTarget: true }) : baseUnit;
+      for (var l = 0; l < left; l++) tail.push(tailUnit);
       if (partial > 0) tail.push(makeLayerUnit(cfg, sol, si, partial, true));
 
       if (tail.length) {
         if (allowMix) {
           tail.forEach(function (u) { tailUnits.push(u); });
+          if (splitTarget) {
+            hasSplitStack = true;
+            var halfCount = perLayer / 2;
+            var halfA = makeLayerUnit(cfg, sol, si, halfCount, true);
+            var halfB = makeLayerUnit(cfg, sol, si, halfCount, true);
+            halfA.substack = true;
+            halfB.substack = true;
+            halfA.stackGroup = si;
+            halfB.stackGroup = si;
+            altTailUnits.push(halfA, halfB);
+          } else {
+            tail.forEach(function (u) { altTailUnits.push(u); });
+          }
         } else {
           var tailPallets = packUnits(tail, cfg, { maxPartials: 1 });
           tailPallets.forEach(function (tp) {
@@ -1787,43 +1860,20 @@
     });
 
     if (allowMix && tailUnits.length) {
-      // 默认每个混托最多一个部分层（大/重在下、小/轻在上）。
-      // 打开“小/轻层垫底补空”后，允许多个部分层同托；只有能减少托数时才采用。
-      var strictMixed = packUnits(tailUnits, cfgBase, { maxPartials: 1 });
-      var looseMixed = packUnits(tailUnits, cfgBase, { maxPartials: 99 });
-      var saving = strictMixed.length - looseMixed.length;
-      plan.potentialSaving = Math.max(0, saving);
-      var chosen = strictMixed;
-      if (options.allowSmallBottom && saving > 0) {
-        chosen = looseMixed;
-        plan.smallBottomUsed = true;
-      }
-      // 如果按规格分组后托数不增加，优先保留同规格尾托，减少无意义的混托和顶层高低差。
-      var bySku = {}, grouped = [];
-      tailUnits.forEach(function (u) {
-        var k = u.skuIndex;
-        if (!bySku[k]) bySku[k] = [];
-        bySku[k].push(u);
-      });
-      Object.keys(bySku).forEach(function (k) {
-        grouped = grouped.concat(packUnits(bySku[k], cfgBase, { maxPartials: 1 }));
-      });
-      if (grouped.length < chosen.length) {
-        chosen = grouped;
-      } else if (grouped.length === chosen.length) {
-        // 托数相同：默认不混托；只有混托确实改善顶层平整度时才保留混托。
-        var groupedFlat = topFlatnessScore(grouped, cfgBase);
-        var mixedFlat = topFlatnessScore(chosen, cfgBase);
-        var keepGrouped;
-        if (groupedFlat[0] !== mixedFlat[0]) {
-          keepGrouped = groupedFlat[0] < mixedFlat[0];
-        } else if (groupedFlat[1] !== mixedFlat[1]) {
-          keepGrouped = groupedFlat[1] < mixedFlat[1];
-        } else {
-          // 高差相同，只有混托明显增加顶层覆盖时才允许混托
-          keepGrouped = groupedFlat[2] >= mixedFlat[2];
+      var packed = packTailCandidates(tailUnits, cfgBase, options);
+      plan.potentialSaving = packed.potentialSaving;
+      plan.smallBottomUsed = packed.smallBottomUsed;
+      var chosen = packed.chosen;
+      if (hasSplitStack) {
+        var altPacked = packTailCandidates(altTailUnits, cfgBase, options);
+        if (altPacked.chosen.length < chosen.length ||
+            (altPacked.chosen.length === chosen.length &&
+             tailSupportMin(altPacked.chosen) >= tailSupportMin(chosen) - EPS)) {
+          chosen = altPacked.chosen;
+          plan.potentialSaving = altPacked.potentialSaving;
+          plan.smallBottomUsed = altPacked.smallBottomUsed;
+          plan.splitStacked = true;
         }
-        if (keepGrouped) chosen = grouped;
       }
       chosen.forEach(function (p) {
         if (p.type === 'mixed') plan.mixedPallets.push(p);
