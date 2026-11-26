@@ -1995,7 +1995,8 @@
         var stdHeight = tailMaxHeight(chosen);
         if (altPacked.chosen.length < chosen.length ||
             (altPacked.chosen.length === chosen.length &&
-             altSup >= stdSup - EPS && altHeight <= stdHeight + EPS)) {
+             (altSup > stdSup + EPS ||
+              (Math.abs(altSup - stdSup) <= EPS && altHeight <= stdHeight + EPS)))) {
           chosen = altPacked.chosen;
           plan.potentialSaving = altPacked.potentialSaving;
           plan.smallBottomUsed = altPacked.smallBottomUsed;
