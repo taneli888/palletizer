@@ -1777,25 +1777,65 @@
         u.z0 = baseZ;
         u.rects = u.rects.map(function (r) { return Object.assign({}, r); });
       });
+      // 410×130 这类长条箱的局部层排成紧凑的 5×2 块，220 尾箱贴着它排成一列，
+      // 避免按风车层随手抽出的 L 形造成架空。
+      var compactDone = false;
+      if (subs.length === 2 && normals.length === 1 &&
+          subs[0].count === subs[1].count && normals[0].count === 4) {
+        var fr0 = full.length ? full[0].rects : [];
+        if (fr0.length) {
+          var bw = Math.min(subs[0].rects[0].w, subs[0].rects[0].h);
+          var bh = Math.max(subs[0].rects[0].w, subs[0].rects[0].h);
+          var baseX = Math.min.apply(null, fr0.map(function (r) { return r.wx; }));
+          var baseY = Math.min.apply(null, fr0.map(function (r) { return r.wy; }));
+          var cols = 5, rows = 2;
+          if (baseX + cols * bw <= cfg.pallet.L + EPS && baseY + rows * bh <= cfg.pallet.W + EPS) {
+            var grid = [];
+            for (var rr = 0; rr < rows; rr++) {
+              for (var cc = 0; cc < cols; cc++) {
+                grid.push({
+                  x: baseX + cc * bw, y: baseY + rr * bh,
+                  wx: baseX + cc * bw, wy: baseY + rr * bh,
+                  w: bw, h: bh, rot: bw !== subs[0].rects[0].w,
+                  skuIndex: subs[0].skuIndex, thickness: subs[0].thickness
+                });
+              }
+            }
+            if (grid.length === subs[0].count) {
+              subs[0].rects = grid.map(function (r) { return Object.assign({}, r); });
+              subs[1].rects = grid.map(function (r) { return Object.assign({}, r); });
+              var maxX = Math.max.apply(null, fr0.map(function (r) { return r.wx; }));
+              var col = fr0.filter(function (r) { return Math.abs(r.wx - maxX) < EPS; })
+                .sort(function (a, b) { return a.wy - b.wy; }).slice(0, 4);
+              if (col.length === 4) {
+                normals[0].rects = col.map(function (r) { return Object.assign({}, r); });
+                compactDone = true;
+              }
+            }
+          }
+        }
+      }
       // 同一高度上还有普通尾箱时，把它放到整层未被局部叠层占用的位置，避免压在同一块区域。
-      var occupied = [];
-      subs.forEach(function (u) { occupied = occupied.concat(u.rects); });
-      normals.forEach(function (u) {
-        if (!full.length || !u.rects.length) return;
-        var candidates = [];
-        full[0].rects.forEach(function (fr) {
-          var hit = occupied.some(function (o) { return overlaps(fr, o); });
-          if (!hit && !candidates.some(function (c) {
-            return Math.abs(c.wx - fr.wx) < EPS && Math.abs(c.wy - fr.wy) < EPS;
-          })) candidates.push(fr);
+      if (!compactDone) {
+        var occupied = [];
+        subs.forEach(function (u) { occupied = occupied.concat(u.rects); });
+        normals.forEach(function (u) {
+          if (!full.length || !u.rects.length) return;
+          var candidates = [];
+          full[0].rects.forEach(function (fr) {
+            var hit = occupied.some(function (o) { return overlaps(fr, o); });
+            if (!hit && !candidates.some(function (c) {
+              return Math.abs(c.wx - fr.wx) < EPS && Math.abs(c.wy - fr.wy) < EPS;
+            })) candidates.push(fr);
+          });
+          if (candidates.length < u.rects.length) return;
+          u.rects.forEach(function (r, i) {
+            var fr = candidates[i];
+            r.x = fr.x; r.y = fr.y; r.wx = fr.wx; r.wy = fr.wy; r.w = fr.w; r.h = fr.h;
+          });
+          occupied = occupied.concat(u.rects);
         });
-        if (candidates.length < u.rects.length) return;
-        u.rects.forEach(function (r, i) {
-          var fr = candidates[i];
-          r.x = fr.x; r.y = fr.y; r.wx = fr.wx; r.wy = fr.wy; r.w = fr.w; r.h = fr.h;
-        });
-        occupied = occupied.concat(u.rects);
-      });
+      }
       p.parallel = true;
       refreshPallet(p, cfg);
     });
