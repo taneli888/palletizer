@@ -1786,8 +1786,9 @@
       // 410×130 这类长条箱的局部层排成紧凑的 5×2 块，220 尾箱贴着它排成一列，
       // 避免按风车层随手抽出的 L 形造成架空。
       var compactDone = false;
-      if (subs.length === 2 && normals.length === 1 &&
-          subs[0].count <= 10 && subs[1].count <= 10 && normals[0].count === 4) {
+      if (subs.length >= 1 && subs.every(function (u) {
+        return u.skuIndex === subs[0].skuIndex && u.count <= 10;
+      }) && normals.length === 1 && normals[0].count === 4) {
         var fr0 = full.length ? full[0].rects : [];
         if (fr0.length) {
           var bw = Math.max(subs[0].rects[0].w, subs[0].rects[0].h);
@@ -1810,8 +1811,9 @@
               }
             }
             if (grid.length === 10) {
-              subs[0].rects = grid.slice(0, subs[0].count).map(function (r) { return Object.assign({}, r); });
-              subs[1].rects = grid.slice(0, subs[1].count).map(function (r) { return Object.assign({}, r); });
+              subs.forEach(function (u) {
+                u.rects = grid.slice(0, u.count).map(function (r) { return Object.assign({}, r); });
+              });
               var row = fr0.filter(function (r) { return Math.abs(r.wy - baseY) < EPS; })
                 .sort(function (a, b) { return a.wx - b.wx; }).slice(0, 4);
               if (row.length === 4) {
@@ -1848,6 +1850,14 @@
     });
   }
 
+  function onePalletTailCandidate(units, cfg) {
+    if (!units || !units.length) return null;
+    var p = makePallet(units.slice().sort(stackOrder), cfg, 'mixed', -1);
+    applyParallelStacks([p], cfg);
+    if (p.height > cfg.stackH + EPS) return null;
+    return [p];
+  }
+
   function buildPlan(cfgs, options) {    options = options || {};
     var allowMix = !!options.allowMix;
     var plan = {
@@ -1861,7 +1871,7 @@
     if (!cfgs || !cfgs.length) return plan;
     var cfgBase = cfgs[0];
     var tailUnits = [];
-    var altTailUnits = [];
+    var splitUnitsBySku = {};
     var hasSplitStack = false;
 
     cfgs.forEach(function (cfg, si) {
@@ -1933,36 +1943,28 @@
       info.tailLayers = left + (partial > 0 ? 1 : 0);
 
       var tail = [];
-      var splitFull = !options.noSplit && left === 1 && partial === 0 && perLayer % 2 === 0;
-      var splitPartial = !options.noSplit && left === 0 && partial > perLayer / 2 && partial < perLayer;
-      var splitTarget = splitFull || splitPartial;
-      var tailUnit = baseUnit;
-      for (var l = 0; l < left; l++) tail.push(tailUnit);
+      var tailTotal = left * perLayer + partial;
+      var blockCap = Math.max(1, Math.floor(perLayer / 2));
+      var chunkCount = tailTotal > blockCap ? Math.ceil(tailTotal / blockCap) : 1;
+      for (var l = 0; l < left; l++) tail.push(baseUnit);
       if (partial > 0) tail.push(makeLayerUnit(cfg, sol, si, partial, true));
 
       if (tail.length) {
         if (allowMix) {
           tail.forEach(function (u) { tailUnits.push(u); });
-          if (splitTarget) {
+          if (chunkCount > 1 && !options.noSplit) {
             hasSplitStack = true;
-            if (splitFull) {
-              var halfCount = perLayer / 2;
-              var halfA = makeLayerUnit(cfg, sol, si, halfCount, true);
-              var halfB = makeLayerUnit(cfg, sol, si, halfCount, true);
-              halfA.substack = true;
-              halfB.substack = true;
-              altTailUnits.push(halfA, halfB);
-            } else {
-              var c1 = Math.ceil(partial / 2);
-              var c2 = Math.floor(partial / 2);
-              var partA = makeLayerUnit(cfg, sol, si, c1, true);
-              var partB = makeLayerUnit(cfg, sol, si, c2, true);
-              partA.substack = true;
-              partB.substack = true;
-              altTailUnits.push(partA, partB);
+            var baseCount = Math.floor(tailTotal / chunkCount);
+            var extra = tailTotal - baseCount * chunkCount;
+            var chunks = [];
+            for (var hc = 0; hc < chunkCount; hc++) {
+              var chunk = baseCount + (hc < extra ? 1 : 0);
+              var su = makeLayerUnit(cfg, sol, si, chunk, true);
+              su.substack = true;
+              su.stackGroup = si;
+              chunks.push(su);
             }
-          } else {
-            tail.forEach(function (u) { altTailUnits.push(u); });
+            splitUnitsBySku[si] = chunks;
           }
         } else {
           var tailPallets = packUnits(tail, cfg, { maxPartials: 1 });
@@ -1987,21 +1989,46 @@
       plan.smallBottomUsed = packed.smallBottomUsed;
       var chosen = packed.chosen;
       if (hasSplitStack) {
-        var altPacked = packTailCandidates(altTailUnits, cfgBase, options);
-        applyParallelStacks(altPacked.chosen, cfgBase);
-        var altSup = tailSupportMin(altPacked.chosen);
-        var stdSup = tailSupportMin(chosen);
-        var altHeight = tailMaxHeight(altPacked.chosen);
-        var stdHeight = tailMaxHeight(chosen);
-        if (altPacked.chosen.length < chosen.length ||
-            (altPacked.chosen.length === chosen.length &&
-             (altSup > stdSup + EPS ||
-              (Math.abs(altSup - stdSup) <= EPS && altHeight <= stdHeight + EPS)))) {
-          chosen = altPacked.chosen;
-          plan.potentialSaving = altPacked.potentialSaving;
-          plan.smallBottomUsed = altPacked.smallBottomUsed;
-          plan.splitStacked = true;
-        }
+        Object.keys(splitUnitsBySku).forEach(function (siKey) {
+          var chunks = splitUnitsBySku[siKey];
+          var inserted = false;
+          var altUnits = [];
+          tailUnits.forEach(function (u) {
+            if (u.skuIndex === Number(siKey)) {
+              if (!inserted) {
+                altUnits = altUnits.concat(chunks);
+                inserted = true;
+              }
+            } else {
+              altUnits.push(u);
+            }
+          });
+          var altPacked;
+          var onePallet = onePalletTailCandidate(altUnits, cfgBase);
+          if (onePallet) {
+            altPacked = {
+              chosen: onePallet,
+              potentialSaving: 0,
+              smallBottomUsed: false
+            };
+          } else {
+            altPacked = packTailCandidates(altUnits, cfgBase, options);
+            applyParallelStacks(altPacked.chosen, cfgBase);
+          }
+          var altSup = tailSupportMin(altPacked.chosen);
+          var stdSup = tailSupportMin(chosen);
+          var altHeight = tailMaxHeight(altPacked.chosen);
+          var stdHeight = tailMaxHeight(chosen);
+          if (altPacked.chosen.length < chosen.length ||
+              (altPacked.chosen.length === chosen.length &&
+               (altSup > stdSup + EPS ||
+                (Math.abs(altSup - stdSup) <= EPS && altHeight <= stdHeight + EPS)))) {
+            chosen = altPacked.chosen;
+            plan.potentialSaving = altPacked.potentialSaving;
+            plan.smallBottomUsed = altPacked.smallBottomUsed;
+            plan.splitStacked = true;
+          }
+        });
       }
       chosen.forEach(function (p) {
         if (p.type === 'mixed') plan.mixedPallets.push(p);

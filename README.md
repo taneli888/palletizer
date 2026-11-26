@@ -3,7 +3,7 @@
 **托盘码放测算台**  
 A responsive pallet loading calculator for iPhone, iPad and desktop.
 
-**v1.9.29：支撑优先于高度；151–156 箱的尾层改为 6+5 到 8+8 紧凑叠放，P3 支撑率 100%，不再为了低 50mm 保留 40% 支撑的旧方案。**
+**v1.9.30：支撑率优先于高度；151–162 全部改为紧凑局部叠层，P3 支撑率 100%。161/162 使用 7+7+7 或 8+7+7，高度 810mm，不再出现 54% 支撑的悬空方案。**
 
 > 目标部署地址：<https://taneli888.github.io/palletizer/>  
 > GitHub 仓库：<https://github.com/taneli888/palletizer>  
